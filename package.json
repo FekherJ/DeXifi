@@ -1,15 +1,19 @@
 {
   "name": "staking-contract",
   "version": "1.0.0",
+
   "description": "A staking and yield farming contract project using Solidity and Hardhat.",
   "scripts": {
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
-    "deploy": "npx hardhat run scripts/deploy.js --network goerli"
+    "deploy": "npx hardhat run scripts/deploy.js --network goerli",
+    "build": "parcel build src/index.html --dist-dir dist"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.6",
     "dotenv": "^10.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "undici": "^6.20.1"
   },
   "devDependencies": {
@@ -31,8 +35,8 @@
     "chai-as-promised": "^8.0.0",
     "chai-ethers": "^0.0.1",
     "ethereum-waffle": "^4.0.10",
-    "ethers": "^6.13.4",
-    "hardhat": "^2.22.15",
+    "ethers": "^6.13.5",
+    "hardhat": "^2.22.18",
     "hardhat-gas-reporter": "^2.2.1",
     "solidity-coverage": "^0.8.13",
     "ts-node": "^10.9.2",
@@ -47,7 +51,7 @@
   ],
   "author": "FekherJ",
   "license": "MIT",
-  "main": "hardhat.config.js",
+  "type": "module",
   "directories": {
     "test": "test"
   }
