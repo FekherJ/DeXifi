@@ -3,13 +3,12 @@ let signer;
 let stakingContract;
 const sepoliaChainId = 11155111;
 const localhostChainId = 31337;
-import { renderReactDashboard } from '../components/react-dashboard';
 
 
 // Contract addresses for different networks
 const contractAddresses = {
     //sepolia: '0x56D2caa1B5E42614764a9F1f71D6DbfFd66487a4',
-    localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788'    // Replace this address with the actual staking contract address (logged in 1_deploy_staking.js)
+    localhost: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'    // Replace this address with the actual staking contract address (logged in 1_deploy_staking.js)
     // don't forget to load the abi json :  cp artifacts/contracts/Staking.sol/Staking.json abi/staking_abi.json
 };
 

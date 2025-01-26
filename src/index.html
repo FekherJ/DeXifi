@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stakely Dashboard</title>
-    <link rel="stylesheet" href="./style.css">
-    <!-- React Bundle -->
-    <script type="module" src="./index.js" defer></script> <!-- This is the React entry point, foor rendering React components-->
-    <script type="module" src="./scripts/staking.js" defer></script> <!-- This is the vanilla JavaScript logic for blockchain interactions -->
-    <!-- we will be migrating individual functions or pieces of staking.js logic into React as you go, without breaking the existing app-->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stakely Dashboard</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="./favicon.ico" type="image/x-icon">
 
+  <!-- Import Tailwind (Optional if not already configured via CDN or PostCSS) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Import React Application -->
+  <script type="module" src="./index.js" defer></script>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-start">
-    <div id="connectionStatus" class="absolute top-4 right-4 bg-gray-800 p-4 rounded-lg shadow-lg">
-        Not connected
-    </div>
+<body class="bg-gradient-to-br from-purple-900 via-gray-900 to-black text-white min-h-screen">
+  <!-- Connection Status (optional notification bar) -->
+  <div
+    id="connectionStatus"
+    class="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-3 rounded-lg shadow-lg"
+  >
+    Not connected
+  </div>
 
-    <!-- React Dashboard Mount Point -->
-    <div id="react-dashboard" class="container mx-auto p-8 text-center"></div>
-
- 
-
+  <!-- Main React Mount Point -->
+  <div id="react-dashboard" class="container mx-auto p-8"></div>
 </body>
 </html>
