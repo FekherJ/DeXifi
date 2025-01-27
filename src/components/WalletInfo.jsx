@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { BrowserProvider, formatEther } from "ethers"; // Updated standalone imports
+import { BrowserProvider, formatEther } from "ethers";
 
 const WalletInfo = () => {
   const [walletAddress, setWalletAddress] = useState("");
   const [walletBalance, setWalletBalance] = useState("0.000 ETH");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -12,7 +13,7 @@ const WalletInfo = () => {
     }
 
     try {
-      const provider = new BrowserProvider(window.ethereum); // Corrected import
+      const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const balance = await provider.getBalance(address);
@@ -24,16 +25,38 @@ const WalletInfo = () => {
     }
   };
 
+  const disconnectWallet = () => {
+    setWalletAddress("");
+    setWalletBalance("0.000 ETH");
+    setIsDropdownOpen(false);
+  };
+
   return (
-    <div className="p-4 glass rounded-md text-center">
+    <div className="relative">
       {walletAddress ? (
-        <>
-          <p className="truncate text-sm text-gray-400">Connected: {walletAddress}</p>
-          <p className="mt-2 text-lg font-bold">Balance: {walletBalance}</p>
-        </>
+        <div
+          className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 text-white px-4 py-2 rounded-full cursor-pointer hover:opacity-90"
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        >
+          <span className="text-sm font-medium">
+            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+          </span>
+          <span className="text-sm">{walletBalance}</span>
+
+          {isDropdownOpen && (
+            <div className="absolute top-12 right-0 bg-gray-800 text-white rounded-lg shadow-lg py-2">
+              <button
+                className="block px-4 py-2 hover:bg-gray-700 w-full text-left"
+                onClick={disconnectWallet}
+              >
+                Disconnect Wallet
+              </button>
+            </div>
+          )}
+        </div>
       ) : (
         <button
-          className="bg-gradient-to-r from-purple-600 to-pink-500 px-4 py-2 rounded-md hover:from-purple-700 hover:to-pink-600"
+          className="bg-gradient-to-r from-purple-600 to-blue-500 px-6 py-2 text-white rounded-full hover:from-purple-700 hover:to-blue-600"
           onClick={connectWallet}
         >
           Connect Wallet

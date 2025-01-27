@@ -1,15 +1,58 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import WalletInfo from "./WalletInfo";
 import StakingInfo from "./StakingInfo";
 import RewardInfo from "./RewardInfo";
 import TransactionHistory from "./TransactionHistory";
+import StakeWithdraw from "./StakeWithdraw";
+import { ethers } from "ethers";
 
-const Dashboard = () => {
+const Dashboard = ({ stakingContract, signer }) => {
   const [activeTab, setActiveTab] = useState("stake");
+  const [stakingBalance, setStakingBalance] = useState("0.000 STK");
+  const [rewardBalance, setRewardBalance] = useState("0.000 RWD");
+  const [walletBalance, setWalletBalance] = useState("0.000 ETH");
+  const [apy, setApy] = useState("0.00%");
+  const [loading, setLoading] = useState(true);
+
+  // Fetch balances and APY
+  const fetchBalances = async () => {
+    if (!stakingContract || !signer) {
+      console.error("stakingContract or signer is missing!");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const address = await signer.getAddress();
+      const walletBal = await signer.getBalance();
+      const stakingBal = await stakingContract.balanceOf(address);
+      const rewards = await stakingContract.earned(address);
+      const rewardRate = await stakingContract.rewardRate();
+      const totalStaked = await stakingContract.totalSupply();
+      const blocksPerYear = (365 * 24 * 60 * 60) / 15; // Assuming 15s block time
+      const yearlyRewards = rewardRate.mul(blocksPerYear);
+
+      setWalletBalance(`${ethers.utils.formatUnits(walletBal, 18)} ETH`);
+      setStakingBalance(`${ethers.utils.formatUnits(stakingBal, 18)} STK`);
+      setRewardBalance(`${ethers.utils.formatUnits(rewards, 18)} RWD`);
+      setApy(
+        totalStaked.isZero()
+          ? "0.00%"
+          : (yearlyRewards.mul(10000).div(totalStaked) / 100).toFixed(2) + "%"
+      );
+    } catch (error) {
+      console.error("Error fetching balances:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBalances();
+  }, [stakingContract, signer]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-black text-white">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 bg-gradient-to-b from-[#090024] to-[#130045] p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold text-purple-400 mb-12">Stakely</h1>
         <nav className="space-y-4">
@@ -36,60 +79,39 @@ const Dashboard = () => {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <header className="flex justify-between items-center p-6 bg-gradient-to-r from-purple-900 to-purple-700 shadow-lg rounded-b-lg">
           <div className="flex items-center gap-6">
             <h2 className="text-3xl font-bold capitalize">{activeTab}</h2>
-            <nav className="hidden md:flex gap-4">
-              <button className="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-800">Wrap</button>
-              <button className="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-800">Bridge</button>
-            </nav>
           </div>
-          <WalletInfo />
+          <div className="absolute top-6 right-6">
+            <WalletInfo />
+          </div>
         </header>
 
-        {/* Main Content */}
         <main className="p-8 space-y-8">
-          {/* Info Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <StakingInfo />
-            <RewardInfo />
-            <TransactionHistory />
+            <StakingInfo
+              stakingBalance={stakingBalance}
+              apy={apy}
+              loading={loading}
+            />
+            <RewardInfo
+              rewardBalance={rewardBalance}
+              loading={loading}
+              stakingContract={stakingContract}
+            />
+            <TransactionHistory stakingContract={stakingContract} signer={signer} />
           </div>
 
-          {/* Action Area */}
+          {/* StakeWithdraw Section */}
           <section className="glass p-6 rounded-lg shadow-lg">
-            {activeTab === "stake" ? (
-              <div>
-                <h3 className="text-2xl font-bold text-purple-400">Stake Tokens</h3>
-                <div className="mt-4 flex gap-4">
-                  <input
-                    type="number"
-                    placeholder="Enter amount"
-                    className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-md focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-md hover:from-purple-600 hover:to-pink-600">
-                    Stake
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h3 className="text-2xl font-bold text-purple-400">Withdraw Tokens</h3>
-                <div className="mt-4 flex gap-4">
-                  <input
-                    type="number"
-                    placeholder="Enter amount"
-                    className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-md focus:ring-2 focus:ring-red-500"
-                  />
-                  <button className="px-6 py-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-md hover:from-red-600 hover:to-orange-600">
-                    Withdraw
-                  </button>
-                </div>
-              </div>
-            )}
+            <StakeWithdraw
+              stakingContract={stakingContract}
+              signer={signer}
+              activeTab={activeTab}
+              onTransactionComplete={fetchBalances}
+            />
           </section>
         </main>
       </div>

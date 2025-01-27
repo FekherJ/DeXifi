@@ -54,7 +54,7 @@ body {
   
   /* Buttons */
   button {
-    background: linear-gradient(to right, #6a21ab, #9f33ee);
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
     color: white;
     padding: 14px 24px;
     border: none;
@@ -62,6 +62,9 @@ body {
     font-weight: bold;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
+
+ 
+  
   
   button:hover {
     transform: scale(1.05);
@@ -126,18 +129,40 @@ body {
     background: linear-gradient(180deg, #090024, #130045);
   }
   
+
+
+
   button {
-    background: linear-gradient(to right, #6b21a8, #9333ea);
+    background: linear-gradient(to right, #6a21ab, #9333ee);
     color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 12px;
+    font-weight: bold;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
   
   button:hover {
-    background: linear-gradient(to right, #9333ea, #6b21a8);
+    transform: scale(1.05);
+    background: linear-gradient(to right, #9333ee, #6a21ab);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
   }
   
-  .glass {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
+  .relative {
+    position: relative;
   }
+
+  button:active {
+    transform: scale(0.95);
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  
+  
+  
   
   
