@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ethers, formatEther } from "ethers"; // Use standalone import for formatEther
+import { BrowserProvider, formatEther } from "ethers"; // Updated standalone imports
 
 const WalletInfo = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -12,7 +12,7 @@ const WalletInfo = () => {
     }
 
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum); // Updated for ethers@6
+      const provider = new BrowserProvider(window.ethereum); // Corrected import
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const balance = await provider.getBalance(address);
