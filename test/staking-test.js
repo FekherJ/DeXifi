@@ -1,6 +1,7 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-require("@nomicfoundation/hardhat-chai-matchers");
+import hardhat from "hardhat";
+const { ethers } = hardhat;
+import { expect } from "chai";
+import "@nomicfoundation/hardhat-chai-matchers";
 
 describe("Staking Contract", function () {
     let stakingToken, rewardToken, stakingContract;
@@ -105,7 +106,6 @@ describe("Staking Contract", function () {
         expect(balance).to.equal(ethers.parseEther("100"));
     });
 
-    // Additional Tests
     it("Should correctly calculate rewards after reward rate change", async function () {
         await stakingToken.connect(user1).approve(stakingContract.getAddress(), ethers.parseEther("100"));
         await stakingContract.connect(user1).stake(ethers.parseEther("100"));
@@ -124,49 +124,6 @@ describe("Staking Contract", function () {
         earned = await stakingContract.earned(user1.address);
         expect(earned).to.be.above(ethers.parseEther("0"));
     });
-
-    xit("Should distribute rewards correctly between multiple users", async function () {
-        await stakingToken.connect(user1).approve(stakingContract.getAddress(), ethers.parseEther("100"));
-        await stakingContract.connect(user1).stake(ethers.parseEther("100"));
-        
-        await stakingToken.connect(user2).approve(stakingContract.getAddress(), ethers.parseEther("200"));
-        await stakingContract.connect(user2).stake(ethers.parseEther("200"));
-    
-        // Transfer reward tokens to the staking contract
-        await rewardToken.transfer(stakingContract.getAddress(), ethers.parseEther("300"));
-        
-        // Check staking contract's reward balance to ensure it has enough tokens
-        const stakingContractRewardBalance = await rewardToken.balanceOf(stakingContract.getAddress());
-        console.log("Staking Contract Reward Balance: ", stakingContractRewardBalance.toString());
-        expect(stakingContractRewardBalance).to.equal(ethers.parseEther("300"));
-    
-        // Check earned rewards before fast-forwarding in time
-        let earnedUser1Before = await stakingContract.earned(user1.address);
-        let earnedUser2Before = await stakingContract.earned(user2.address);
-        console.log("User1 earned before time advancement: ", earnedUser1Before.toString());
-        console.log("User2 earned before time advancement: ", earnedUser2Before.toString());
-        
-        // Fast-forward in time to accumulate rewards
-        await ethers.provider.send("evm_increaseTime", [86400]); // 1 day
-        await ethers.provider.send("evm_mine", []);
-    
-        // Check rewards after fast-forwarding in time
-        let earnedUser1After = await stakingContract.earned(user1.address);
-        let earnedUser2After = await stakingContract.earned(user2.address);
-        
-        // Log earned values for debugging
-        console.log("User1 earned after time advancement: ", earnedUser1After.toString());
-        console.log("User2 earned after time advancement: ", earnedUser2After.toString());
-    
-        // Ensure both users have earned rewards
-        expect(earnedUser1After).to.be.above(ethers.parseEther("0"));
-        expect(earnedUser2After).to.be.above(ethers.parseEther("0"));
-        
-        // Ensure user2 gets more rewards than user1 due to larger stake
-        expect(earnedUser2After).to.be.above(earnedUser1After);
-    });    
-    
-    
 
     it("Should still allow users to claim rewards after withdrawing staked tokens", async function () {
         await stakingToken.connect(user1).approve(stakingContract.getAddress(), ethers.parseEther("100"));
@@ -200,4 +157,3 @@ describe("Staking Contract", function () {
         expect(earned).to.be.above(ethers.parseEther("0"));
     });
 });
-
