@@ -16,12 +16,13 @@ const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComple
           const amountInWei = parseUnits(amount, 18);
           console.log("Amount in Wei:", amountInWei.toString());
       
-          // Ensure approval for staking
+          // Approve tokens for staking
           if (type === "stake") {
             const tokenContract = new Contract(tokenAddress, TokenABI, signer);
+            console.log("Approving tokens...");
             const approveTx = await tokenContract.approve(stakingContract.address, amountInWei);
             await approveTx.wait();
-            console.log("Tokens approved for staking.");
+            console.log("Tokens approved.");
           }
       
           // Execute staking or withdrawal
@@ -30,7 +31,7 @@ const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComple
               ? await stakingContract.stake(amountInWei)
               : await stakingContract.withdraw(amountInWei);
       
-          console.log("Transaction Sent:", tx);
+          console.log("Transaction sent:", tx);
           await tx.wait();
           alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
       
@@ -38,9 +39,10 @@ const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComple
           if (onTransactionComplete) onTransactionComplete();
         } catch (error) {
           console.error(`Error during ${type}:`, error);
-          alert(`Failed to ${type} tokens. Check the logs for details.`);
+          alert(`Failed to ${type} tokens. Error: ${error.message}`);
         }
       };
+      
       
 
   return (
