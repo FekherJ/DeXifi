@@ -1,6 +1,10 @@
 import React from "react";
 
 const StakingInfo = ({ stakingBalance, loading }) => {
+  if (!stakingBalance && !loading) {
+    return <p>Unable to load staking info. Please try again.</p>;
+  }
+
   return (
     <div className="glass text-center">
       <h3 className="text-xl font-semibold text-purple-400">Staking Info</h3>
@@ -12,4 +16,4 @@ const StakingInfo = ({ stakingBalance, loading }) => {
   );
 };
 
-export default StakingInfo;
+export default StakingInfo; // Ensure this is a default export

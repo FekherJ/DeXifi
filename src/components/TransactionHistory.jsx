@@ -8,19 +8,45 @@ const TransactionHistory = ({ stakingContract, signer }) => {
       if (stakingContract && signer) {
         try {
           const address = await signer.getAddress();
-          const filter = stakingContract.filters.Transfer(address, null);
-          const events = await stakingContract.queryFilter(filter);
-          const formattedEvents = events.map((event) => ({
-            type: event.args[0] === address ? "Withdrawal" : "Deposit",
-            amount: event.args[2].toString(),
-            timestamp: new Date(event.blockNumber * 1000).toLocaleString(),
-          }));
+    
+          // Fetch Staked events
+          const stakeFilter = stakingContract.filters.Staked(address, null, null);
+          const stakeEvents = await stakingContract.queryFilter(stakeFilter);
+    
+          // Fetch Withdrawn events
+          const withdrawFilter = stakingContract.filters.Withdrawn(address, null, null);
+          const withdrawEvents = await stakingContract.queryFilter(withdrawFilter);
+    
+          // Fetch RewardPaid events (optional)
+          const rewardFilter = stakingContract.filters.RewardPaid(address, null, null);
+          const rewardEvents = await stakingContract.queryFilter(rewardFilter);
+    
+          // Combine and format events
+          const formattedEvents = [
+            ...stakeEvents.map(event => ({
+              type: "Stake",
+              amount: event.args.amount.toString(),
+              timestamp: new Date(event.args.timestamp * 1000).toLocaleString(),
+            })),
+            ...withdrawEvents.map(event => ({
+              type: "Withdraw",
+              amount: event.args.amount.toString(),
+              timestamp: new Date(event.args.timestamp * 1000).toLocaleString(),
+            })),
+            ...rewardEvents.map(event => ({
+              type: "Reward",
+              amount: event.args.reward.toString(),
+              timestamp: new Date(event.args.timestamp * 1000).toLocaleString(),
+            })),
+          ];
+    
           setTransactions(formattedEvents);
         } catch (error) {
           console.error("Error fetching transaction history:", error);
         }
       }
     };
+    
 
     fetchTransactions();
   }, [stakingContract, signer]);

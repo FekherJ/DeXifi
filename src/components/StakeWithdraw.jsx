@@ -1,33 +1,47 @@
 import React from "react";
-import { ethers } from "ethers";
+import { parseUnits } from "ethers"; // Correct import for parseUnits
+
 
 const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComplete }) => {
-  const handleTransaction = async (type) => {
-    const inputId = type === "stake" ? "stakeAmount" : "withdrawAmount";
-    const amount = document.getElementById(inputId).value;
-
-    if (!amount || amount <= 0) {
-      alert(`Please enter a valid amount to ${type}.`);
-      return;
-    }
-
-    try {
-      const amountInWei = ethers.utils.parseUnits(amount, 18);
-      const tx =
-        type === "stake"
-          ? await stakingContract.stake(amountInWei)
-          : await stakingContract.withdraw(amountInWei);
-
-      await tx.wait();
-      alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
-
-      // Notify parent to refresh data
-      if (onTransactionComplete) onTransactionComplete();
-    } catch (error) {
-      console.error(`Error during ${type}:`, error);
-      alert(`Failed to ${type} tokens.`);
-    }
-  };
+    const handleTransaction = async (type) => {
+        const inputId = type === "stake" ? "stakeAmount" : "withdrawAmount";
+        const amount = document.getElementById(inputId).value;
+      
+        if (!amount || amount <= 0) {
+          alert(`Please enter a valid amount to ${type}.`);
+          return;
+        }
+      
+        try {
+          const amountInWei = parseUnits(amount, 18);
+          console.log("Amount in Wei:", amountInWei.toString());
+      
+          // Ensure approval for staking
+          if (type === "stake") {
+            const tokenContract = new Contract(tokenAddress, TokenABI, signer);
+            const approveTx = await tokenContract.approve(stakingContract.address, amountInWei);
+            await approveTx.wait();
+            console.log("Tokens approved for staking.");
+          }
+      
+          // Execute staking or withdrawal
+          const tx =
+            type === "stake"
+              ? await stakingContract.stake(amountInWei)
+              : await stakingContract.withdraw(amountInWei);
+      
+          console.log("Transaction Sent:", tx);
+          await tx.wait();
+          alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
+      
+          // Notify parent to refresh data
+          if (onTransactionComplete) onTransactionComplete();
+        } catch (error) {
+          console.error(`Error during ${type}:`, error);
+          alert(`Failed to ${type} tokens. Check the logs for details.`);
+        }
+      };
+      
 
   return (
     <div>

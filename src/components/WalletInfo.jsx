@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BrowserProvider, formatEther } from "ethers";
 
-const WalletInfo = () => {
+const WalletInfo = ({ onWalletConnect }) => {
   const [walletAddress, setWalletAddress] = useState("");
   const [walletBalance, setWalletBalance] = useState("0.000 ETH");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -11,19 +11,28 @@ const WalletInfo = () => {
       alert("MetaMask is not installed.");
       return;
     }
-
+  
     try {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const balance = await provider.getBalance(address);
-
+  
+      if (!signer || !address) {
+        throw new Error("Failed to retrieve wallet signer or address.");
+      }
+  
       setWalletAddress(address);
       setWalletBalance(`${formatEther(balance)} ETH`);
+  
+      // Pass signer to parent
+      if (onWalletConnect) onWalletConnect(signer);
     } catch (error) {
       console.error("Error connecting wallet:", error);
+      alert("Failed to connect wallet. Please try again.");
     }
   };
+  
 
   const disconnectWallet = () => {
     setWalletAddress("");

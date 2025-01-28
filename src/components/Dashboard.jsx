@@ -1,55 +1,74 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import WalletInfo from "./WalletInfo";
 import StakingInfo from "./StakingInfo";
 import RewardInfo from "./RewardInfo";
 import TransactionHistory from "./TransactionHistory";
 import StakeWithdraw from "./StakeWithdraw";
-import { ethers } from "ethers";
+import { BrowserProvider, Contract } from "ethers";
+import StakingContractABI from "../../abi/staking_abi.json";
 
-const Dashboard = ({ stakingContract, signer }) => {
+const Dashboard = () => {
+  const [signer, setSigner] = useState(null);
+  const [stakingContract, setStakingContract] = useState(null);
   const [activeTab, setActiveTab] = useState("stake");
-  const [stakingBalance, setStakingBalance] = useState("0.000 STK");
-  const [rewardBalance, setRewardBalance] = useState("0.000 RWD");
-  const [walletBalance, setWalletBalance] = useState("0.000 ETH");
-  const [apy, setApy] = useState("0.00%");
-  const [loading, setLoading] = useState(true);
 
-  // Fetch balances and APY
-  const fetchBalances = async () => {
-    if (!stakingContract || !signer) {
-      console.error("stakingContract or signer is missing!");
-      setLoading(false);
+  const handleWalletConnect = async (connectedSigner) => {
+    if (!connectedSigner) {
+      console.error("Connected signer is invalid.");
+      alert("Invalid signer detected. Please reconnect your wallet.");
       return;
     }
-
+  
     try {
-      const address = await signer.getAddress();
-      const walletBal = await signer.getBalance();
-      const stakingBal = await stakingContract.balanceOf(address);
-      const rewards = await stakingContract.earned(address);
-      const rewardRate = await stakingContract.rewardRate();
-      const totalStaked = await stakingContract.totalSupply();
-      const blocksPerYear = (365 * 24 * 60 * 60) / 15; // Assuming 15s block time
-      const yearlyRewards = rewardRate.mul(blocksPerYear);
-
-      setWalletBalance(`${ethers.utils.formatUnits(walletBal, 18)} ETH`);
-      setStakingBalance(`${ethers.utils.formatUnits(stakingBal, 18)} STK`);
-      setRewardBalance(`${ethers.utils.formatUnits(rewards, 18)} RWD`);
-      setApy(
-        totalStaked.isZero()
-          ? "0.00%"
-          : (yearlyRewards.mul(10000).div(totalStaked) / 100).toFixed(2) + "%"
+      console.log("Initializing staking contract...");
+      setSigner(connectedSigner);
+  
+      const stakingContractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // Update this address if needed
+      console.log("Staking Contract Address:", stakingContractAddress);
+  
+      // Validate address
+      if (!stakingContractAddress || stakingContractAddress === "0x") {
+        throw new Error("Invalid staking contract address.");
+      }
+  
+      const provider = connectedSigner.provider;
+      const network = await provider.getNetwork();
+      console.log("Connected Network:", network);
+  
+      // Validate network
+      const expectedChainId = 31337; // Chain ID for localhost
+      if (Number(network.chainId) !== expectedChainId) {
+        throw new Error(
+          `Incorrect network detected. Expected chainId: ${expectedChainId}, but connected to chainId: ${network.chainId}`
+        );
+      }
+  
+      // Validate ABI
+      if (!Array.isArray(StakingContractABI.abi) || StakingContractABI.abi.length === 0) {
+        throw new Error("Invalid staking contract ABI.");
+      }
+  
+      // Initialize the contract
+      const stakingContractInstance = new Contract(
+        stakingContractAddress,
+        StakingContractABI.abi,
+        connectedSigner
       );
+  
+      console.log("Staking Contract Instance Initialized:", stakingContractInstance);
+      setStakingContract(stakingContractInstance);
     } catch (error) {
-      console.error("Error fetching balances:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error initializing staking contract:", error);
+      alert(error.message || "Failed to initialize staking contract. Please try again.");
     }
   };
-
-  useEffect(() => {
-    fetchBalances();
-  }, [stakingContract, signer]);
+  
+  
+  
+  
+  
+  
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-black text-white">
@@ -85,34 +104,33 @@ const Dashboard = ({ stakingContract, signer }) => {
             <h2 className="text-3xl font-bold capitalize">{activeTab}</h2>
           </div>
           <div className="absolute top-6 right-6">
-            <WalletInfo />
+            <WalletInfo onWalletConnect={handleWalletConnect} />
           </div>
         </header>
 
         <main className="p-8 space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <StakingInfo
-              stakingBalance={stakingBalance}
-              apy={apy}
-              loading={loading}
-            />
-            <RewardInfo
-              rewardBalance={rewardBalance}
-              loading={loading}
-              stakingContract={stakingContract}
-            />
-            <TransactionHistory stakingContract={stakingContract} signer={signer} />
-          </div>
+          {stakingContract && signer ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <StakingInfo stakingContract={stakingContract} signer={signer} />
+                <RewardInfo stakingContract={stakingContract} signer={signer} />
+                <TransactionHistory stakingContract={stakingContract} signer={signer} />
+              </div>
 
-          {/* StakeWithdraw Section */}
-          <section className="glass p-6 rounded-lg shadow-lg">
-            <StakeWithdraw
-              stakingContract={stakingContract}
-              signer={signer}
-              activeTab={activeTab}
-              onTransactionComplete={fetchBalances}
-            />
-          </section>
+              <section className="glass p-6 rounded-lg shadow-lg">
+                <StakeWithdraw
+                  stakingContract={stakingContract}
+                  signer={signer}
+                  activeTab={activeTab}
+                  onTransactionComplete={() => {
+                    console.log("Transaction Complete - Refresh data as needed");
+                  }}
+                />
+              </section>
+            </>
+          ) : (
+            <p>Please connect your wallet to view staking details.</p>
+          )}
         </main>
       </div>
     </div>
