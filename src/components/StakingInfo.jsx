@@ -1,8 +1,33 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
-const StakingInfo = ({ stakingBalance, loading }) => {
-  if (!stakingBalance && !loading) {
-    return <p>Unable to load staking info. Please try again.</p>;
+const StakingInfo = ({ stakingContract, signer }) => {
+  const [stakingBalance, setStakingBalance] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStakingBalance = async () => {
+      if (!stakingContract || !signer) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const address = await signer.getAddress();
+        const balance = await stakingContract.balances(address); // ✅ Correct function
+        setStakingBalance(balance.toString());
+      } catch (error) {
+        console.error("Error fetching staking balance:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStakingBalance();
+  }, [stakingContract, signer]);
+
+  if (!loading && (stakingBalance === null || stakingBalance === undefined)) {
+    return <p className="text-red-500">Unable to load staking info. Please try again.</p>;
   }
 
   return (
@@ -16,4 +41,4 @@ const StakingInfo = ({ stakingBalance, loading }) => {
   );
 };
 
-export default StakingInfo; // Ensure this is a default export
+export default StakingInfo;

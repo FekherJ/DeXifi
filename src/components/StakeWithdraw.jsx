@@ -1,49 +1,53 @@
+// StakeWithdraw.jsx
 import React from "react";
-import { parseUnits } from "ethers"; // Correct import for parseUnits
+import { parseUnits, Contract } from "ethers";
+import tokenABI from "../../abi/erc20Mock_abi.json";
 
+const tokenAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComplete }) => {
-    const handleTransaction = async (type) => {
-        const inputId = type === "stake" ? "stakeAmount" : "withdrawAmount";
-        const amount = document.getElementById(inputId).value;
-      
-        if (!amount || amount <= 0) {
-          alert(`Please enter a valid amount to ${type}.`);
-          return;
-        }
-      
-        try {
-          const amountInWei = parseUnits(amount, 18);
-          console.log("Amount in Wei:", amountInWei.toString());
-      
-          // Approve tokens for staking
-          if (type === "stake") {
-            const tokenContract = new Contract(tokenAddress, TokenABI, signer);
-            console.log("Approving tokens...");
-            const approveTx = await tokenContract.approve(stakingContract.address, amountInWei);
-            await approveTx.wait();
-            console.log("Tokens approved.");
-          }
-      
-          // Execute staking or withdrawal
-          const tx =
-            type === "stake"
-              ? await stakingContract.stake(amountInWei)
-              : await stakingContract.withdraw(amountInWei);
-      
-          console.log("Transaction sent:", tx);
-          await tx.wait();
-          alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
-      
-          // Notify parent to refresh data
-          if (onTransactionComplete) onTransactionComplete();
-        } catch (error) {
-          console.error(`Error during ${type}:`, error);
-          alert(`Failed to ${type} tokens. Error: ${error.message}`);
-        }
-      };
-      
-      
+  const handleTransaction = async (type) => {
+    try {
+      // Validate stakingContract and signer
+      if (!stakingContract || !signer || !stakingContract.address) {
+        alert("Staking contract or signer is not properly initialized.");
+        return;
+      }
+
+      const inputId = type === "stake" ? "stakeAmount" : "withdrawAmount";
+      const amount = document.getElementById(inputId).value;
+
+      if (!amount || amount <= 0) {
+        alert(`Please enter a valid amount to ${type}.`);
+        return;
+      }
+
+      const amountInWei = parseUnits(amount, 18);
+      console.log("Amount in Wei:", amountInWei.toString());
+
+      if (type === "stake") {
+        const tokenContract = new Contract(tokenAddress, tokenABI.abi, signer);
+        console.log("Approving tokens...");
+        const approveTx = await tokenContract.approve(stakingContract.address, amountInWei);
+        await approveTx.wait();
+        console.log("Tokens approved.");
+      }
+
+      const tx =
+        type === "stake"
+          ? await stakingContract.stake(amountInWei)
+          : await stakingContract.withdraw(amountInWei);
+
+      console.log("Transaction sent:", tx);
+      await tx.wait();
+      alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
+
+      if (onTransactionComplete) onTransactionComplete();
+    } catch (error) {
+      console.error(`Error during ${type}:`, error);
+      alert(`Failed to ${type} tokens. Error: ${error.message}`);
+    }
+  };
 
   return (
     <div>
