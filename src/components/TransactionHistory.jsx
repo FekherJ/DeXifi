@@ -8,6 +8,10 @@ const TransactionHistory = ({ stakingContract, signer }) => {
       if (stakingContract && signer) {
         try {
           const address = await signer.getAddress();
+
+          console.log("Received Signer:", signer);
+          console.log("Received Staking Contract:", stakingContract.address);
+
     
           // Fetch Staked events
           const stakeFilter = stakingContract.filters.Staked(address, null, null);

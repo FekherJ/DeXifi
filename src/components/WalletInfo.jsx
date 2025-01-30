@@ -22,6 +22,8 @@ const WalletInfo = ({ onWalletConnect }) => {
         throw new Error("Failed to retrieve wallet signer or address.");
       }
   
+      console.log("Connected Wallet:", address);
+  
       setWalletAddress(address);
       setWalletBalance(`${formatEther(balance)} ETH`);
   
@@ -32,6 +34,7 @@ const WalletInfo = ({ onWalletConnect }) => {
       alert("Failed to connect wallet. Please try again.");
     }
   };
+  
   
 
   const disconnectWallet = () => {

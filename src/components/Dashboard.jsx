@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import WalletInfo from "./WalletInfo";
 import StakingInfo from "./StakingInfo";
 import RewardInfo from "./RewardInfo";
@@ -12,63 +12,54 @@ const Dashboard = () => {
   const [stakingContract, setStakingContract] = useState(null);
   const [activeTab, setActiveTab] = useState("stake");
 
+  const STAKING_CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // Update this as needed
+
+  useEffect(() => {
+    console.log("🔄 Updated stakingContract state:", stakingContract);
+  }, [stakingContract]);
+
   const handleWalletConnect = async (connectedSigner) => {
     if (!connectedSigner) {
-      console.error("Connected signer is invalid.");
       alert("Invalid signer detected. Please reconnect your wallet.");
       return;
     }
-  
+
     try {
-      console.log("Initializing staking contract...");
+      console.log("⚡ Initializing staking contract...");
       setSigner(connectedSigner);
-  
-      const stakingContractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // Update this address if needed
-      console.log("Staking Contract Address:", stakingContractAddress);
-  
-      // Validate address
-      if (!stakingContractAddress || stakingContractAddress === "0x") {
-        throw new Error("Invalid staking contract address.");
-      }
-  
+
       const provider = connectedSigner.provider;
       const network = await provider.getNetwork();
-      console.log("Connected Network:", network);
-  
-      // Validate network
-      const expectedChainId = 31337; // Chain ID for localhost
+      const expectedChainId = 31337; // Update if using a different network
+
       if (Number(network.chainId) !== expectedChainId) {
-        throw new Error(
-          `Incorrect network detected. Expected chainId: ${expectedChainId}, but connected to chainId: ${network.chainId}`
-        );
+        throw new Error("Incorrect network. Switch to the expected chain.");
       }
-  
-      // Validate ABI
-      if (!Array.isArray(StakingContractABI.abi) || StakingContractABI.abi.length === 0) {
-        throw new Error("Invalid staking contract ABI.");
+
+      // ✅ NEW: Ensure ABI is correctly loaded
+      if (!StakingContractABI || !StakingContractABI.abi) {
+        throw new Error("Staking contract ABI is missing.");
       }
-  
-      // Initialize the contract
+
+      // ✅ Correctly initialize staking contract
       const stakingContractInstance = new Contract(
-        stakingContractAddress,
+        STAKING_CONTRACT_ADDRESS,
         StakingContractABI.abi,
         connectedSigner
       );
-  
-      console.log("Staking Contract Instance Initialized:", stakingContractInstance);
+
+      console.log("✅ Staking Contract Initialized:", stakingContractInstance);
       setStakingContract(stakingContractInstance);
+
+      // Debugging log after state update delay
+      setTimeout(() => {
+        console.log("🚀 Updated stakingContract in state:", stakingContractInstance);
+      }, 500);
     } catch (error) {
-      console.error("Error initializing staking contract:", error);
-      alert(error.message || "Failed to initialize staking contract. Please try again.");
+      console.error("❌ Error initializing contract:", error);
+      alert("Failed to initialize staking contract. Please try again.");
     }
   };
-  
-  
-  
-  
-  
-  
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-black text-white">
@@ -123,7 +114,10 @@ const Dashboard = () => {
                   signer={signer}
                   activeTab={activeTab}
                   onTransactionComplete={() => {
-                    console.log("Transaction Complete - Refresh data as needed");
+                    console.log("Transaction Complete - Refreshing Data");
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 2000);
                   }}
                 />
               </section>

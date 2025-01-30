@@ -1,77 +1,83 @@
-// StakeWithdraw.jsx
-import React from "react";
+// StakeWithdraw.jsx (Updated)
+import React, { useState, useEffect } from "react";
 import { parseUnits, Contract } from "ethers";
-import tokenABI from "../../abi/erc20Mock_abi.json";
 
-const tokenAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComplete }) => {
-  const handleTransaction = async (type) => {
+  const [stakeAmount, setStakeAmount] = useState(""); // Input value for staking amount
+  const [loading, setLoading] = useState(false); // Loading state for button
+  const [tokenAddress, setTokenAddress] = useState(""); // Token address from staking contract
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const fetchTokenAddress = async () => {
+      try {
+        if (!stakingContract) {
+          throw new Error("Staking contract not initialized.");
+        }
+        const address = await stakingContract.stakingToken();
+        setTokenAddress(address);
+        console.log("Token Address fetched:", address);
+      } catch (error) {
+        setErrorMessage("Failed to fetch token address. Check the contract configuration.");
+        console.error("Error fetching token address:", error);
+      }
+    };
+
+    fetchTokenAddress();
+  }, [stakingContract]);
+
+  const handleStake = async () => {
     try {
-      // Validate stakingContract and signer
-      if (!stakingContract || !signer || !stakingContract.address) {
-        alert("Staking contract or signer is not properly initialized.");
-        return;
+      if (!stakingContract || !tokenAddress) {
+        throw new Error("Staking contract or token address is missing.");
       }
 
-      const inputId = type === "stake" ? "stakeAmount" : "withdrawAmount";
-      const amount = document.getElementById(inputId).value;
+      setLoading(true);
+      const amountInWei = parseUnits(stakeAmount, 18);
 
-      if (!amount || amount <= 0) {
-        alert(`Please enter a valid amount to ${type}.`);
-        return;
-      }
+      // Approve the staking contract to spend tokens
+      const tokenContract = new Contract(
+        tokenAddress,
+        ["function approve(address spender, uint256 amount) public returns (bool)"],
+        signer
+      );
+      const approveTx = await tokenContract.approve(stakingContract.getAddress(), amountInWei);
+      await approveTx.wait();
 
-      const amountInWei = parseUnits(amount, 18);
-      console.log("Amount in Wei:", amountInWei.toString());
+      // Stake tokens
+      const stakeTx = await stakingContract.stake(amountInWei);
+      await stakeTx.wait();
 
-      if (type === "stake") {
-        const tokenContract = new Contract(tokenAddress, tokenABI.abi, signer);
-        console.log("Approving tokens...");
-        const approveTx = await tokenContract.approve(stakingContract.address, amountInWei);
-        await approveTx.wait();
-        console.log("Tokens approved.");
-      }
-
-      const tx =
-        type === "stake"
-          ? await stakingContract.stake(amountInWei)
-          : await stakingContract.withdraw(amountInWei);
-
-      console.log("Transaction sent:", tx);
-      await tx.wait();
-      alert(`Tokens successfully ${type === "stake" ? "staked" : "withdrawn"}!`);
-
-      if (onTransactionComplete) onTransactionComplete();
+      onTransactionComplete?.();
     } catch (error) {
-      console.error(`Error during ${type}:`, error);
-      alert(`Failed to ${type} tokens. Error: ${error.message}`);
+      setErrorMessage("Error during staking. Ensure sufficient balance and approval.");
+      console.error("Error during staking:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h3 className="text-2xl font-bold text-purple-400">
-        {activeTab === "stake" ? "Stake Tokens" : "Withdraw Tokens"}
-      </h3>
-      <div className="mt-4 flex gap-4">
-        <input
-          type="number"
-          id={activeTab === "stake" ? "stakeAmount" : "withdrawAmount"}
-          placeholder="Enter amount"
-          className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-md focus:ring-2 focus:ring-purple-500"
-        />
-        <button
-          className={`px-6 py-2 rounded-md ${
-            activeTab === "stake"
-              ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-              : "bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
-          }`}
-          onClick={() => handleTransaction(activeTab)}
-        >
-          {activeTab === "stake" ? "Stake" : "Withdraw"}
-        </button>
-      </div>
+    <div className="glass p-6 rounded-lg shadow-lg">
+      <h3 className="text-xl font-bold mb-4">Stake Tokens</h3>
+      <input
+        type="number"
+        value={stakeAmount}
+        onChange={(e) => setStakeAmount(e.target.value)}
+        placeholder="Enter amount to stake"
+        className="w-full p-3 mb-4 rounded-lg border-2 border-purple-500 focus:outline-none focus:border-purple-700"
+      />
+      {errorMessage && <p className="text-red-500 text-sm mb-4">{errorMessage}</p>}
+      <button
+        onClick={handleStake}
+        className={`w-full p-3 rounded-lg font-bold ${
+          loading ? "bg-gray-500" : "bg-purple-600 hover:bg-purple-700"
+        } text-white`}
+        disabled={loading}
+      >
+        {loading ? "Staking..." : "Stake"}
+      </button>
     </div>
   );
 };
