@@ -1,4 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { Contract } from "ethers";
+import tokenABI from "../../abi/erc20Mock_abi.json";
+
+const tokenAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Token contract address
 
 const TransactionHistory = ({ stakingContract, signer, refreshKey }) => {
   const [transactions, setTransactions] = useState([]);
@@ -8,6 +12,12 @@ const TransactionHistory = ({ stakingContract, signer, refreshKey }) => {
       if (stakingContract && signer) {
         try {
           const address = await signer.getAddress();
+
+          // Fetch token decimals
+          const tokenContract = new Contract(tokenAddress, tokenABI.abi, signer);
+          const decimals = await tokenContract.decimals();
+
+          const divisor = BigInt(10) ** BigInt(decimals); // Use BigInt for divisor
 
           const stakeFilter = stakingContract.filters.Staked(address, null, null);
           const stakeEvents = await stakingContract.queryFilter(stakeFilter);
@@ -21,17 +31,17 @@ const TransactionHistory = ({ stakingContract, signer, refreshKey }) => {
           const formattedEvents = [
             ...stakeEvents.map((event) => ({
               type: "Stake",
-              amount: event.args.amount.toString(),
+              amount: (BigInt(event.args.amount) / divisor).toString(), // Convert to token units as string
               timestamp: new Date(Number(event.args.timestamp) * 1000).toLocaleString(),
             })),
             ...withdrawEvents.map((event) => ({
               type: "Withdraw",
-              amount: event.args.amount.toString(),
+              amount: (BigInt(event.args.amount) / divisor).toString(), // Convert to token units as string
               timestamp: new Date(Number(event.args.timestamp) * 1000).toLocaleString(),
             })),
             ...rewardEvents.map((event) => ({
               type: "Reward",
-              amount: event.args.reward.toString(),
+              amount: (BigInt(event.args.reward) / divisor).toString(), // Convert to token units as string
               timestamp: new Date(Number(event.args.timestamp) * 1000).toLocaleString(),
             })),
           ];
