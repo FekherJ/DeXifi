@@ -11,8 +11,9 @@ const Dashboard = () => {
   const [signer, setSigner] = useState(null);
   const [stakingContract, setStakingContract] = useState(null);
   const [activeTab, setActiveTab] = useState("stake");
+  const [refreshKey, setRefreshKey] = useState(0); // To force data refresh
 
-  const STAKING_CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // Update this as needed
+  const STAKING_CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
 
   useEffect(() => {
     console.log("🔄 Updated stakingContract state:", stakingContract);
@@ -30,18 +31,12 @@ const Dashboard = () => {
 
       const provider = connectedSigner.provider;
       const network = await provider.getNetwork();
-      const expectedChainId = 31337; // Update if using a different network
+      const expectedChainId = 31337;
 
       if (Number(network.chainId) !== expectedChainId) {
         throw new Error("Incorrect network. Switch to the expected chain.");
       }
 
-      // ✅ NEW: Ensure ABI is correctly loaded
-      if (!StakingContractABI || !StakingContractABI.abi) {
-        throw new Error("Staking contract ABI is missing.");
-      }
-
-      // ✅ Correctly initialize staking contract
       const stakingContractInstance = new Contract(
         STAKING_CONTRACT_ADDRESS,
         StakingContractABI.abi,
@@ -50,15 +45,14 @@ const Dashboard = () => {
 
       console.log("✅ Staking Contract Initialized:", stakingContractInstance);
       setStakingContract(stakingContractInstance);
-
-      // Debugging log after state update delay
-      setTimeout(() => {
-        console.log("🚀 Updated stakingContract in state:", stakingContractInstance);
-      }, 500);
     } catch (error) {
       console.error("❌ Error initializing contract:", error);
       alert("Failed to initialize staking contract. Please try again.");
     }
+  };
+
+  const refreshData = () => {
+    setRefreshKey((prevKey) => prevKey + 1); // Increment to force re-render
   };
 
   return (
@@ -103,9 +97,21 @@ const Dashboard = () => {
           {stakingContract && signer ? (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <StakingInfo stakingContract={stakingContract} signer={signer} />
-                <RewardInfo stakingContract={stakingContract} signer={signer} />
-                <TransactionHistory stakingContract={stakingContract} signer={signer} />
+                <StakingInfo
+                  stakingContract={stakingContract}
+                  signer={signer}
+                  refreshKey={refreshKey}
+                />
+                <RewardInfo
+                  stakingContract={stakingContract}
+                  signer={signer}
+                  refreshKey={refreshKey}
+                />
+                <TransactionHistory
+                  stakingContract={stakingContract}
+                  signer={signer}
+                  refreshKey={refreshKey}
+                />
               </div>
 
               <section className="glass p-6 rounded-lg shadow-lg">
@@ -113,12 +119,7 @@ const Dashboard = () => {
                   stakingContract={stakingContract}
                   signer={signer}
                   activeTab={activeTab}
-                  onTransactionComplete={() => {
-                    console.log("Transaction Complete - Refreshing Data");
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 2000);
-                  }}
+                  onTransactionComplete={refreshData} // Call refresh instead of reload
                 />
               </section>
             </>

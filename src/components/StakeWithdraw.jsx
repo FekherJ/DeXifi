@@ -1,12 +1,11 @@
-// StakeWithdraw.jsx (Updated)
 import React, { useState, useEffect } from "react";
-import { parseUnits, Contract } from "ethers";
+import { parseUnits, Contract, parseEther, parseUnits } from "ethers";
 
 
 const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComplete }) => {
-  const [stakeAmount, setStakeAmount] = useState(""); // Input value for staking amount
-  const [loading, setLoading] = useState(false); // Loading state for button
-  const [tokenAddress, setTokenAddress] = useState(""); // Token address from staking contract
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [tokenAddress, setTokenAddress] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -32,31 +31,71 @@ const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComple
       if (!stakingContract || !tokenAddress) {
         throw new Error("Staking contract or token address is missing.");
       }
-
+  
       setLoading(true);
-      const amountInWei = parseUnits(stakeAmount, 18);
-
-      // Approve the staking contract to spend tokens
+  
+      // Create the token contract instance
       const tokenContract = new Contract(
         tokenAddress,
-        ["function approve(address spender, uint256 amount) public returns (bool)"],
+        [
+          "function approve(address spender, uint256 amount) public returns (bool)",
+          "function allowance(address owner, address spender) public view returns (uint256)",
+          "function balanceOf(address owner) public view returns (uint256)",
+          "function decimals() public view returns (uint8)",
+        ],
         signer
       );
-      const approveTx = await tokenContract.approve(stakingContract.getAddress(), amountInWei);
-      await approveTx.wait();
-
+  
+      // Fetch token decimals
+      const decimals = await tokenContract.decimals();
+      const amountInWei = parseUnits(stakeAmount, decimals); // Convert the amount to Wei using decimals
+      console.log("Stake Amount (in Wei):", amountInWei.toString());
+  
+      // Get the token balance
+      const tokenBalance = await tokenContract.balanceOf(await signer.getAddress());
+      console.log("Token Balance (in Wei):", tokenBalance.toString());
+      if (tokenBalance < amountInWei) {
+        throw new Error("Insufficient token balance for staking.");
+      }
+  
+      // Fetch allowance
+      const stakingAddress = await stakingContract.getAddress();
+      const allowance = await tokenContract.allowance(await signer.getAddress(), stakingAddress);
+      console.log("Current Allowance (in Wei):", allowance.toString());
+  
+      // Approve tokens if allowance is insufficient
+      if (allowance < amountInWei) {
+        console.log("Allowance insufficient! Approving tokens...");
+        const approveTx = await tokenContract.approve(stakingAddress, amountInWei);
+        console.log("Approval Transaction Sent:", approveTx.hash);
+        await approveTx.wait();
+        console.log("Approval Confirmed");
+      }
+  
       // Stake tokens
       const stakeTx = await stakingContract.stake(amountInWei);
+      console.log("Stake Transaction Sent:", stakeTx.hash);
       await stakeTx.wait();
-
-      onTransactionComplete?.();
+      console.log("Stake Confirmed");
+  
+      onTransactionComplete?.(); // Refresh data after staking
     } catch (error) {
-      setErrorMessage("Error during staking. Ensure sufficient balance and approval.");
       console.error("Error during staking:", error);
+      setErrorMessage(error.error?.message || error.message || "Error during staking.");
     } finally {
       setLoading(false);
     }
   };
+  
+  
+  
+
+  
+  
+  
+  
+  
+  
 
   return (
     <div className="glass p-6 rounded-lg shadow-lg">

@@ -15,36 +15,37 @@ const StakingInfo = ({ stakingContract, signer }) => {
         setLoading(false);
         return;
       }
-
+  
       try {
         setLoading(true);
         const address = await signer.getAddress();
-        console.log("Fetching balance for address:", address);
-
+        console.log("Fetching staking balance for address:", address);
+  
         // Fetch raw staking balance (in Wei)
         const rawBalance = await stakingContract.balances(address);
-        console.log("Fetched Staking Balance (Wei):", rawBalance.toString());
-
+        console.log("Raw Staking Balance (in Wei):", rawBalance.toString());
+  
         // Fetch decimals from token contract
         const tokenContract = new Contract(tokenAddress, tokenABI.abi, signer);
         const decimals = await tokenContract.decimals();
         console.log("Token Decimals:", decimals);
-
-        // Convert balance to token units using BigInt
-        const divisor = BigInt(10) ** BigInt(decimals); // 10^decimals as BigInt
-        const balanceInSTK = (rawBalance * BigInt(100)) / divisor; // Scale by 100 to keep two decimal places
-        console.log("Converted Staking Balance (STK):", balanceInSTK.toString());
-
-        setStakingBalance((Number(balanceInSTK) / 100).toFixed(2)); // Convert back to float with 2 decimals
+  
+        // Convert balance to token units
+        const divisor = BigInt(10) ** BigInt(decimals);
+        const balanceInTokens = rawBalance / divisor;
+        console.log("Converted Staking Balance:", balanceInTokens.toString());
+  
+        setStakingBalance(balanceInTokens.toString());
       } catch (error) {
         console.error("Error fetching staking balance:", error);
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchStakingBalance();
   }, [stakingContract, signer]);
+  
 
   return (
     <div className="glass text-center">
