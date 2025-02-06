@@ -34,7 +34,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0d001f] via-[#090027] to-[#1a0033] text-white">
       <header className="flex justify-between items-center px-8 py-6 bg-gradient-to-r from-[#140033] to-[#250050] shadow-lg">
-        <h1 className="text-2xl font-bold tracking-wide">EtherFi-Styled UI</h1>
+        <h1 className="text-2xl font-bold tracking-wide">Stakely</h1>
         <WalletInfo onWalletConnect={setSigner} />
       </header>
 
