@@ -53,3 +53,8 @@ ignition/deployments/chain-31337
 
 *.log
 
+# Ignore build files
+dist/
+build/
+
+
