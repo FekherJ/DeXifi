@@ -79,6 +79,8 @@ const StakeWithdraw = ({ stakingContract, signer, activeTab, onTransactionComple
       console.log("Stake Confirmed");
   
       onTransactionComplete?.(); // Refresh data after staking
+
+   
     } catch (error) {
       console.error("Error during staking:", error);
       setErrorMessage(error.error?.message || error.message || "Error during staking.");

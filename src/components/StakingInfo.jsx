@@ -59,7 +59,7 @@ const StakingInfo = ({ stakingContract, signer }) => {
       // Refresh staking balance
       const userAddress = await signer.getAddress();
       const updatedBalance = await stakingContract.balances(userAddress);
-      setStakingBalance(formatUnits(updatedBalance, 18)); // Convert to readable format
+      setStakingBalance(formatUnits(updatedBalance, 18));
       setWithdrawAmount(""); // Clear input
     } catch (error) {
       console.error("⚠️ Error during withdrawal:", error.message);

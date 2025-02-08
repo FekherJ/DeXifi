@@ -16,7 +16,7 @@ const StakeSection = ({ stakingContract, signer }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="card p-6">
-        <StakeWithdraw stakingContract={stakingContract} signer={signer} />
+        <StakeWithdraw stakingContract={stakingContract} signer={signer} onTransactionComplete={() => fetchBalance()}/>
       </div>
       <div className="space-y-6">
         <StakingInfo stakingContract={stakingContract} signer={signer} />
