@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { Contract, parseUnits } from "ethers";
 import SwapABI from "../../../abi/DEXRouter_abi.json";
+import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
 
 // Import contract address from .env
-const SWAP_CONTRACT_ADDRESS = process.env.REACT_APP_SWAP_CONTRACT_ADDRESS;
+const SWAP_CONTRACT_ADDRESS = process.env.REACT_APP_DEX_ROUTER_ADDRESS;
 
 // Token Address Map
 const tokenAddresses = {
-  ETH: "0xYourEthereumTokenAddress", // Replace with the actual token contract address for WETH
+  ETH: process.env.REACT_APP_WETH_ADDRESS, // Replace with the actual token contract address for WETH
   STK: process.env.REACT_APP_STAKING_TOKEN_ADDRESS,  // Replace with the STK token contract address
   RWD: process.env.REACT_APP_REWARD_TOKEN_ADDRESS,   // Replace with the RWD token contract address
 };
+
+
 
 const SwapForm = ({ signer }) => {
   const [fromToken, setFromToken] = useState("ETH");
@@ -24,34 +27,49 @@ const SwapForm = ({ signer }) => {
       setError("⚠️ Please connect your wallet.");
       return;
     }
-
+  
     try {
       setLoading(true);
       setError("");
-
+  
       console.log(`Swapping ${amount} ${fromToken} for ${toToken}`);
-
+  
       const swapContract = new Contract(SWAP_CONTRACT_ADDRESS, SwapABI, signer);
 
+      conseole.log(SwapABI);
+  
       // Convert amount to BigNumber (assuming 18 decimals for tokens)
       const amountInWei = parseUnits(amount, 18);
-
+  
       // Get token addresses dynamically
       const fromTokenAddress = tokenAddresses[fromToken];
       const toTokenAddress = tokenAddresses[toToken];
-
+  
       // Ensure token addresses exist
       if (!fromTokenAddress || !toTokenAddress) {
         throw new Error("Invalid token selection.");
       }
-
+  
       console.log(`Using Token Addresses: ${fromTokenAddress} -> ${toTokenAddress}`);
 
-      const swapTx = await swapContract.swap(amountInWei, fromTokenAddress, toTokenAddress);
-
+      console.log("SWAP_CONTRACT_ADDRESS:", SWAP_CONTRACT_ADDRESS);
+      console.log("Token Addresses:", tokenAddresses);
+  
+      // Ensure function exists
+      if (typeof swapContract.swap !== "function") {
+        throw new Error("The swap function is not defined in the contract.");
+      }
+  
+      // Call the swap function correctly based on ABI
+      const swapTx = await swapContract.swap(
+        amountInWei, 
+        fromTokenAddress, 
+        toTokenAddress
+      );
+  
       console.log("Transaction Sent:", swapTx.hash);
       await swapTx.wait();
-
+  
       console.log("✅ Swap Successful!");
     } catch (err) {
       console.error("⚠️ Error swapping tokens:", err.message);
@@ -60,6 +78,8 @@ const SwapForm = ({ signer }) => {
       setLoading(false);
     }
   };
+  
+  
 
   return (
     <div className="p-6 bg-gray-900 rounded-lg">

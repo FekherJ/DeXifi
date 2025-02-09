@@ -12,11 +12,10 @@ if (!existsSync(abiDir)) {
 
 // Explicit mapping for renaming ABIs
 const abiMapping = {
-  "DEXRouter.sol": "swap_abi.json",
+  "DEXRouter.sol": "DEXRouter_abi.json",
   "LiquidityPool.sol": "LiquidityPool_abi.json",
   "Staking.sol": "staking_abi.json",
-  "WETHMock.sol": "erc20Mock_abi.json", // Added this line for WETH ABI
-
+  "ERC20Mock.sol": "ERC20Mock_abi.json",
 };
 
 // Function to copy ABI files with renaming support
@@ -27,26 +26,31 @@ const copyAbiFiles = (dir) => {
     const stat = statSync(filePath);
 
     if (stat.isDirectory()) {
-      copyAbiFiles(filePath);
-    } else if (file.endsWith(".json")) {
-      const fileContent = JSON.parse(readFileSync(filePath, "utf8"));
+      copyAbiFiles(filePath); // Recursively search subdirectories
+    } else if (file.endsWith(".json") && !file.endsWith(".dbg.json")) { // Skip debug files
+      try {
+        const fileContent = JSON.parse(readFileSync(filePath, "utf8"));
 
-      if (fileContent.abi) {
-        // Determine the correct filename
-        const contractName = basename(file, ".json");
-        let abiFileName = `${contractName}_abi.json`;
+        if (fileContent.abi) {
+          const contractName = basename(file, ".json");
+          let abiFileName = `${contractName}_abi.json`;
 
-        // Rename based on the mapping
-        Object.keys(abiMapping).forEach((contractFile) => {
-          if (filePath.includes(contractFile)) {
-            abiFileName = abiMapping[contractFile];
-          }
-        });
+          // Apply custom naming if the contract is mapped
+          Object.keys(abiMapping).forEach((contractFile) => {
+            if (filePath.includes(contractFile)) {
+              abiFileName = abiMapping[contractFile];
+            }
+          });
 
-        const abiFilePath = join(abiDir, abiFileName);
+          const abiFilePath = join(abiDir, abiFileName);
+          writeFileSync(abiFilePath, JSON.stringify(fileContent.abi, null, 2));
 
-        writeFileSync(abiFilePath, JSON.stringify(fileContent.abi, null, 2));
-        console.log(`✅ Copied ABI: ${abiFileName}`);
+          console.log(`✅ Copied ABI: ${abiFileName}`);
+        } else {
+          console.warn(`⚠️ No ABI found in ${file}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error reading ABI from ${file}:`, error.message);
       }
     }
   });
