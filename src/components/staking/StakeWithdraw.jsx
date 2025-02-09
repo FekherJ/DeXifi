@@ -25,12 +25,17 @@ const StakeWithdraw = ({ stakingContract, signer, onTransactionComplete }) => {
         console.error("Token address is not available!");
         return;
       }
+      console.log(`⏳ Staking ${stakeAmount} tokens...`);
+      
       await handleStake(stakeAmount, tokenAddress);
+      
+      console.log("✅ Staking successful!");
       onTransactionComplete?.();
     } catch (error) {
-      console.error(error.message);
+      console.error("⚠️ Staking Error:", error.message);
     }
   };
+  
 
   return (
     <div className="glass p-6 rounded-lg shadow-lg">

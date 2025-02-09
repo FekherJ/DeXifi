@@ -27,7 +27,7 @@ const useStakingLogic = (stakingContract, signer) => {
       const userAddress = await getUserAddress();
       if (!userAddress) return;
 
-      const balance = await stakingContract.getFunction("balances")(userAddress);
+      const balance = await stakingContract.balances(userAddress);
       setStakingBalance(formatUnits(balance, 18)); // Assuming 18 decimals
     } catch (err) {
       console.error("⚠️ Error fetching staking balance:", err.message);
@@ -56,18 +56,18 @@ const useStakingLogic = (stakingContract, signer) => {
       const userAddress = await getUserAddress();
       if (!userAddress) return;
 
-      const decimals = await tokenContract.getFunction("decimals")();
+      const decimals = await tokenContract.decimals();
       const amountInWei = parseUnits(stakeAmount, decimals);
 
-      const stakingAddress = await stakingContract.getAddress(); // Fix contract address fetching
-      const allowance = await tokenContract.getFunction("allowance")(userAddress, stakingAddress);
+      const stakingAddress = await stakingContract.getAddress();
+      const allowance = await tokenContract.allowance(userAddress, stakingAddress);
 
       if (allowance < amountInWei) {
-        const approveTx = await tokenContract.getFunction("approve")(stakingAddress, amountInWei);
+        const approveTx = await tokenContract.approve(stakingAddress, amountInWei);
         await approveTx.wait();
       }
 
-      const stakeTx = await stakingContract.getFunction("stake")(amountInWei);
+      const stakeTx = await stakingContract.stake(amountInWei);
       await stakeTx.wait();
     } catch (error) {
       console.error("Error during staking:", error.message);
@@ -89,7 +89,7 @@ const useStakingLogic = (stakingContract, signer) => {
 
       // Convert input amount to BigNumber (18 decimals assumed)
       const amountInWei = parseUnits(withdrawAmount, 18);
-      const withdrawTx = await stakingContract.getFunction("withdraw")(amountInWei);
+      const withdrawTx = await stakingContract.withdraw(amountInWei);
       console.log("Withdrawal transaction sent:", withdrawTx.hash);
       await withdrawTx.wait();
 
@@ -109,7 +109,6 @@ const useStakingLogic = (stakingContract, signer) => {
     fetchBalance();
   }, [stakingContract, signer]);
 
-  // ✅ Fix: Return `handleWithdraw`
   return { stakingBalance, fetchBalance, handleStake, handleWithdraw, error };
 };
 
