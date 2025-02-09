@@ -1,6 +1,7 @@
 import hardhat from "hardhat";
 const { ethers } = hardhat;
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -25,14 +26,32 @@ async function main() {
   const rewardToken = await ERC20Mock.deploy("Reward Token", "RWD");
   await rewardToken.waitForDeployment();
 
-  console.log("Staking Token deployed to:", await stakingToken.getAddress());
-  console.log("Reward Token deployed to:", await rewardToken.getAddress());
+  const stakingTokenAddress = await stakingToken.getAddress();
+  const rewardTokenAddress = await rewardToken.getAddress();
+
+  console.log("Staking Token deployed at:", stakingTokenAddress);
+  console.log("Reward Token deployed at:", rewardTokenAddress);
 
   // Deploy the staking contract with stakingToken and rewardToken addresses
   const Staking = await ethers.getContractFactory("Staking");
   const stakingContract = await Staking.deploy(stakingToken.getAddress(), rewardToken.getAddress());
   await stakingContract.waitForDeployment();
+  const stakingContractAddress = await stakingContract.getAddress();
   console.log("Staking Contract deployed to:", await stakingContract.getAddress());
+
+  // ✅ Overwrite `.env` file with new contract addresses
+  const envConfig = `
+  ALCHEMY_URL=${process.env.ALCHEMY_URL}
+  PRIVATE_KEY=${process.env.PRIVATE_KEY}
+  ETHERSCAN_API_KEY=${process.env.ETHERSCAN_API_KEY}
+  REACT_APP_STAKING_CONTRACT_ADDRESS=${stakingContractAddress}
+  REACT_APP_STAKING_TOKEN_ADDRESS=${stakingTokenAddress}
+  REACT_APP_REWARD_TOKEN_ADDRESS=${rewardTokenAddress}
+    `.trim(); // ✅ Ensures no blank lines
+
+  fs.writeFileSync(".env", envConfig);
+  console.log("✅ Updated .env with new contract addresses");
+
 
   // Mint some tokens for testing purposes
   const mintAmount = ethers.parseUnits("10000000", 18);
