@@ -14,7 +14,9 @@ if (!existsSync(abiDir)) {
 const abiMapping = {
   "DEXRouter.sol": "swap_abi.json",
   "LiquidityPool.sol": "LiquidityPool_abi.json",
-  "Staking.sol": "staking_abi.json"
+  "Staking.sol": "staking_abi.json",
+  "WETHMock.sol": "erc20Mock_abi.json", // Added this line for WETH ABI
+
 };
 
 // Function to copy ABI files with renaming support

@@ -2,14 +2,32 @@ import React, { useState } from "react";
 import useStakingLogic from "../../hooks/useStakingLogic.js";
 
 const StakingInfo = ({ stakingContract, signer }) => {
-  const { stakingBalance, handleWithdraw } = useStakingLogic(stakingContract, signer);
+  const { stakingBalance, handleWithdraw, fetchBalance } = useStakingLogic(stakingContract, signer);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleWithdrawClick = async () => {
     try {
+      if (!withdrawAmount || isNaN(withdrawAmount) || parseFloat(withdrawAmount) <= 0) {
+        setError("Enter a valid withdrawal amount.");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      console.log(`⏳ Withdrawing ${withdrawAmount} STK...`);
+
       await handleWithdraw(withdrawAmount);
+
+      console.log("✅ Withdrawal successful!");
+      setWithdrawAmount(""); // Reset input field
+      await fetchBalance(); // Refresh staking balance
     } catch (error) {
-      console.error(error.message);
+      console.error("⚠️ Withdrawal Error:", error.message);
+      setError(error.message || "Withdrawal failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -26,8 +44,15 @@ const StakingInfo = ({ stakingContract, signer }) => {
         onChange={(e) => setWithdrawAmount(e.target.value)}
         className="w-full p-3 text-lg text-white bg-gray-800 border border-purple-500 rounded-lg"
       />
-      <button onClick={handleWithdrawClick} className="w-full px-6 py-3 text-lg font-bold bg-red-600 text-white rounded-lg">
-        Withdraw
+      {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+      <button
+        onClick={handleWithdrawClick}
+        disabled={loading}
+        className={`w-full px-6 py-3 text-lg font-bold rounded-lg ${
+          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-600 hover:bg-red-700 text-white"
+        }`}
+      >
+        {loading ? "Processing..." : "Withdraw"}
       </button>
     </div>
   );

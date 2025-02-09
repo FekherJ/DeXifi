@@ -1,8 +1,16 @@
 import React, { useState } from "react";
-import { Contract } from "ethers";
-import SwapABI from "../../../abi/swap_abi.json"; // Replace with your actual ABI
+import { Contract, parseUnits } from "ethers";
+import SwapABI from "../../../abi/DEXRouter_abi.json";
 
-const SWAP_CONTRACT_ADDRESS = "0xYourSwapContractAddress"; // Replace with actual contract address
+// Import contract address from .env
+const SWAP_CONTRACT_ADDRESS = process.env.REACT_APP_SWAP_CONTRACT_ADDRESS;
+
+// Token Address Map
+const tokenAddresses = {
+  ETH: "0xYourEthereumTokenAddress", // Replace with the actual token contract address for WETH
+  STK: process.env.REACT_APP_STAKING_TOKEN_ADDRESS,  // Replace with the STK token contract address
+  RWD: process.env.REACT_APP_REWARD_TOKEN_ADDRESS,   // Replace with the RWD token contract address
+};
 
 const SwapForm = ({ signer }) => {
   const [fromToken, setFromToken] = useState("ETH");
@@ -23,17 +31,23 @@ const SwapForm = ({ signer }) => {
 
       console.log(`Swapping ${amount} ${fromToken} for ${toToken}`);
 
-      const swapContract = new Contract(
-        SWAP_CONTRACT_ADDRESS,
-        SwapABI,
-        signer
-      );
+      const swapContract = new Contract(SWAP_CONTRACT_ADDRESS, SwapABI, signer);
 
-      const swapTx = await swapContract.swapTokens(
-        fromToken,
-        toToken,
-        amount
-      );
+      // Convert amount to BigNumber (assuming 18 decimals for tokens)
+      const amountInWei = parseUnits(amount, 18);
+
+      // Get token addresses dynamically
+      const fromTokenAddress = tokenAddresses[fromToken];
+      const toTokenAddress = tokenAddresses[toToken];
+
+      // Ensure token addresses exist
+      if (!fromTokenAddress || !toTokenAddress) {
+        throw new Error("Invalid token selection.");
+      }
+
+      console.log(`Using Token Addresses: ${fromTokenAddress} -> ${toTokenAddress}`);
+
+      const swapTx = await swapContract.swap(amountInWei, fromTokenAddress, toTokenAddress);
 
       console.log("Transaction Sent:", swapTx.hash);
       await swapTx.wait();
