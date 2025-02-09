@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import WalletInfo from "./WalletInfo";
-import StakeSection from "./StakeSection";
-import SwapForm from "./DEX/SwapForm";  // ✅ Fixed import path
-import Sidebar from "./Sidebar";
-import LiquidityPools from "./LiquidityPools";
+import WalletInfo from "../common/WalletInfo";
+import StakeSection from "../staking/StakeSection";  // ✅ Fixed import path
+import SwapForm from "../DEX/SwapForm";  // ✅ Fixed import path
+import Sidebar from "../common/Sidebar";
+import LiquidityPools from "../liquidity/LiquidityPools";
 import { Contract } from "ethers";
-import StakingContractABI from "../../abi/staking_abi.json";
+import StakingContractABI from "../../../abi/staking_abi.json";
 
 
 const Dashboard = () => {

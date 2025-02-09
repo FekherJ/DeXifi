@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client"; // Use createRoot from ReactDOM
-import Dashboard from "./components/Dashboard";
+import Dashboard from "./components/dashboard/Dashboard";
 
 // Find the mount point in the DOM
 const rootElement = document.getElementById("react-dashboard");

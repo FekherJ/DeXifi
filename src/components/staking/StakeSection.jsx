@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import StakingInfo from "./StakingInfo";
-import RewardInfo from "./RewardInfo";
-import TransactionHistory from "./TransactionHistory";
+import RewardInfo from "../common/RewardInfo";
+import TransactionHistory from "../common/TransactionHistory";
 import StakeWithdraw from "./StakeWithdraw";
 
 const StakeSection = ({ stakingContract, signer }) => {
