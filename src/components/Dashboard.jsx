@@ -25,7 +25,7 @@ const Dashboard = () => {
       console.log("🔄 Initializing staking contract...");
       const contract = new Contract(
         STAKING_CONTRACT_ADDRESS,
-        StakingContractABI.abi,
+        StakingContractABI,
         signer
       );
       setStakingContract(contract);

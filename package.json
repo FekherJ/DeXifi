@@ -10,7 +10,8 @@
     "build": "parcel build src/index.html",
     "start": "parcel src/index.html",
     "tailwind-init": "tailwindcss init",
-    "predeploy": "npm run build"
+    "predeploy": "npm run build",
+    "copy-abi": "node scripts/copyAbi.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.6",
