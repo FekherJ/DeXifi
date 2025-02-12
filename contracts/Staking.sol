@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 // Importing the ERC20 interface to interact with ERC20 tokens,
 // and importing OpenZeppelin's Ownable, ReentrancyGuard, and Pausable contracts for added functionality.
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 // Staking contract allows users to stake tokens and earn rewards
 // Contract includes reentrancy protection, pausable functionality, and automatic reward compounding
@@ -38,7 +38,7 @@ contract Staking is Ownable, ReentrancyGuard, Pausable {
     event RewardAdded(uint256 rewardAmount);   // New event to log when new rewards are added
 
     // Constructor initializes the staking and reward tokens with the provided addresses
-    constructor(address _stakingToken, address _rewardToken) {
+    constructor(address _stakingToken, address _rewardToken) Ownable(msg.sender) {
         stakingToken = IERC20(_stakingToken);
         rewardToken = IERC20(_rewardToken);
     }
@@ -103,7 +103,6 @@ contract Staking is Ownable, ReentrancyGuard, Pausable {
     // totalSupply function: Returns the total amount of staked tokens in the contract
     function totalSupply() public view returns (uint256) {
         return stakingToken.balanceOf(address(this));
-        
     }
 
     // Pausable functions to allow the owner to pause and unpause the contract in case of emergency

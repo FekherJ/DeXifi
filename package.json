@@ -14,7 +14,6 @@
     "copy-abi": "node scripts/copyAbi.js"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.6",
     "dotenv": "^10.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -30,6 +29,8 @@
     "@nomicfoundation/hardhat-verify": "^2.0.11",
     "@nomicfoundation/ignition-core": "^0.15.6",
     "@nomiclabs/hardhat-etherscan": "^3.1.8",
+    "@openzeppelin/contracts": "^5.2.0",
+    "@openzeppelin/contracts-upgradeable": "^5.2.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/mocha": "^10.0.9",

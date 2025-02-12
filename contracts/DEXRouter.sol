@@ -1,61 +1,49 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
 interface ILiquidityPool {
-    function addLiquidity(address tokenA, address tokenB, uint amountA, uint amountB) external;
-    function removeLiquidity(address tokenA, address tokenB, uint lpAmount) external;
-    function getAmountOut(uint amountIn, address tokenIn, address tokenOut) external view returns (uint);
+    function addLiquidity(uint256 amountA, uint256 amountB) external;
+    function removeLiquidity(uint256 lpAmount) external;
+    function swap(address tokenIn, address tokenOut, uint256 amountIn) external returns (uint256 amountOut);
 }
 
-contract DEXRouter is Ownable {
-    ILiquidityPool public liquidityPool;
+interface ILiquidityPoolFactory {
+    function getPool(address tokenA, address tokenB) external view returns (address);
+}
 
-    constructor(address _liquidityPool) {
-        liquidityPool = ILiquidityPool(_liquidityPool);
+
+contract DEXRouter {
+    ILiquidityPoolFactory public factory;
+
+    event LiquidityAdded(address indexed provider, address tokenA, address tokenB, uint256 amountA, uint256 amountB);
+    event LiquidityRemoved(address indexed provider, address tokenA, address tokenB, uint256 lpAmount);
+    event SwapExecuted(address indexed trader, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+
+    constructor(address _factory) {
+        factory = ILiquidityPoolFactory(_factory);
     }
 
-    // Swap Tokens
-    function swap(
-        uint amountIn,
-        address tokenIn,
-        address tokenOut
-    ) external {
-        require(amountIn > 0, "Amount must be greater than zero");
-        uint amountOut = liquidityPool.getAmountOut(amountIn, tokenIn, tokenOut);
-        require(amountOut > 0, "Insufficient liquidity");
+    function addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB) external {
+        address pool = factory.getPool(tokenA, tokenB);
+        require(pool != address(0), "Liquidity pool does not exist");
 
-        IERC20(tokenIn).transferFrom(msg.sender, address(liquidityPool), amountIn);
-        IERC20(tokenOut).transfer(msg.sender, amountOut);
+        ILiquidityPool(pool).addLiquidity(amountA, amountB);
+        emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA, amountB);
     }
 
-    // Add Liquidity
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint amountA,
-        uint amountB
-    ) external {
-        require(amountA > 0 && amountB > 0, "Amounts must be greater than zero");
+    function removeLiquidity(address tokenA, address tokenB, uint256 lpAmount) external {
+        address pool = factory.getPool(tokenA, tokenB);
+        require(pool != address(0), "Liquidity pool does not exist");
 
-        IERC20(tokenA).transferFrom(msg.sender, address(liquidityPool), amountA);
-        IERC20(tokenB).transferFrom(msg.sender, address(liquidityPool), amountB);
-        
-        liquidityPool.addLiquidity(tokenA, tokenB, amountA, amountB);
+        ILiquidityPool(pool).removeLiquidity(lpAmount);
+        emit LiquidityRemoved(msg.sender, tokenA, tokenB, lpAmount);
     }
 
-    // Remove Liquidity
-    function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint lpAmount
-    ) external {
-        require(lpAmount > 0, "LP amount must be greater than zero");
+    function swap(address tokenIn, address tokenOut, uint256 amountIn) external {
+        address pool = factory.getPool(tokenIn, tokenOut);
+        require(pool != address(0), "Liquidity pool does not exist");
 
-        liquidityPool.removeLiquidity(tokenA, tokenB, lpAmount);
-        IERC20(tokenA).transfer(msg.sender, lpAmount);
-        IERC20(tokenB).transfer(msg.sender, lpAmount);
+        uint256 amountOut = ILiquidityPool(pool).swap(tokenIn, tokenOut, amountIn);
+        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
 }

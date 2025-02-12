@@ -1,9 +1,15 @@
 # Node.js dependencies
 node_modules/
 
+# Ignore build files
+dist/
+build/
+
 # Hardhat cache
 cache/
 artifacts/
+
+console/
 
 # dotenv environment variables file
 .env
@@ -52,9 +58,5 @@ ignition/deployments/chain-31337
 .parcel-cache/
 
 *.log
-
-# Ignore build files
-dist/
-build/
 
 
