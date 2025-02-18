@@ -13,7 +13,13 @@ const Dashboard = () => {
   const [stakingContract, setStakingContract] = useState(null);
   const [activeTab, setActiveTab] = useState("staking");
 
-  const STAKING_CONTRACT_ADDRESS = process.env.VITE_STAKING_CONTRACT_ADDRESS;
+  const STAKING_CONTRACT_ADDRESS = import.meta.env.VITE_STAKING_CONTRACT_ADDRESS;
+
+  console.log("Staking Contract Address:", import.meta.env.VITE_STAKING_CONTRACT_ADDRESS);
+  if (!import.meta.env.VITE_STAKING_CONTRACT_ADDRESS) {
+    console.error("⚠️ Staking contract address is missing from .env!");
+  }
+
 
   useEffect(() => {
     if (!signer) {
