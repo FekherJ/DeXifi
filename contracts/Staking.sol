@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
+
 // Staking contract allows users to stake tokens and earn rewards
 // Contract includes reentrancy protection, pausable functionality, and automatic reward compounding
 contract Staking is Ownable, ReentrancyGuard, Pausable {

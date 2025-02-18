@@ -13,7 +13,9 @@ if (!process.env.ALCHEMY_URL || !process.env.PRIVATE_KEY) {
 }
 
 export default {
-  solidity: "0.8.24",
+
+  solidity: "0.8.24", // Update to match Uniswap v4 dependencies
+    
   networks: {
     sepolia: {
       url: process.env.ALCHEMY_URL,
