@@ -13,7 +13,7 @@ const Dashboard = () => {
   const [stakingContract, setStakingContract] = useState(null);
   const [activeTab, setActiveTab] = useState("staking");
 
-  const STAKING_CONTRACT_ADDRESS = process.env.REACT_APP_STAKING_CONTRACT_ADDRESS;
+  const STAKING_CONTRACT_ADDRESS = process.env.VITE_STAKING_CONTRACT_ADDRESS;
 
   useEffect(() => {
     if (!signer) {
