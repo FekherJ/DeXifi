@@ -44,9 +44,9 @@ async function main() {
   ALCHEMY_URL=${process.env.ALCHEMY_URL}
   PRIVATE_KEY=${process.env.PRIVATE_KEY}
   ETHERSCAN_API_KEY=${process.env.ETHERSCAN_API_KEY}
-  REACT_APP_STAKING_CONTRACT_ADDRESS=${stakingContractAddress}
-  REACT_APP_STAKING_TOKEN_ADDRESS=${stakingTokenAddress}
-  REACT_APP_REWARD_TOKEN_ADDRESS=${rewardTokenAddress}
+  VITE_STAKING_CONTRACT_ADDRESS=${stakingContractAddress}
+  VITE_STAKING_TOKEN_ADDRESS=${stakingTokenAddress}
+  VITE_REWARD_TOKEN_ADDRESS=${rewardTokenAddress}
     `.trim(); // ✅ Ensures no blank lines
 
   fs.writeFileSync(".env", envConfig);
