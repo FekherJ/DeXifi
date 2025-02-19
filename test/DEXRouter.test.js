@@ -10,17 +10,30 @@ describe("DEXRouter - Uniswap v4", function () {
     let DEXRouter, dexRouter;
     let TokenA, TokenB, tokenA, tokenB;
     let WETH;
-    let poolManager;
+    let poolManager, unlockHelper;
 
     before(async function () {
         [owner, user1, user2] = await ethers.getSigners();
 
-        // 🚀 Deploy Pool Manager (Uniswap V4)
+        // 🚀 Deploy Pool Manager
         console.log("🚀 Deploying Uniswap V4 Pool Manager...");
-        const PoolManager = await ethers.getContractFactory("Uniswap/PoolManager");
-        poolManager = await PoolManager.deploy();
+        const PoolManager = await ethers.getContractFactory("PoolManager");
+        poolManager = await PoolManager.deploy(owner.address);
         await poolManager.waitForDeployment();
         console.log("✅ Pool Manager deployed at:", await poolManager.getAddress());
+
+        // 🚀 Deploy Unlock Helper
+        console.log("🚀 Deploying Unlock Helper...");
+        const UnlockHelper = await ethers.getContractFactory("UnlockHelper");
+        unlockHelper = await UnlockHelper.deploy(await poolManager.getAddress());
+        await unlockHelper.waitForDeployment();
+        console.log("✅ Unlock Helper deployed at:", await unlockHelper.getAddress());
+
+        // 🚀 Unlock PoolManager using UnlockHelper
+        console.log("🚀 Unlocking PoolManager...");
+        const unlockTx = await unlockHelper.unlock("0x"); // Only pass bytes
+        await unlockTx.wait();
+        console.log("✅ PoolManager unlocked successfully!");
 
         // 🚀 Deploy WETH
         console.log("🚀 Deploying WETH...");
@@ -43,14 +56,7 @@ describe("DEXRouter - Uniswap v4", function () {
         await tokenB.waitForDeployment();
         console.log("✅ Token B deployed at:", await tokenB.getAddress());
 
-        // 🚀 Mint tokens to test accounts
-        console.log("🚀 Minting tokens to test users...");
-        await tokenA.mint(owner.address, ethers.parseEther("1000"));
-        await tokenB.mint(owner.address, ethers.parseEther("1000"));
-        await tokenA.mint(user1.address, ethers.parseEther("1000"));
-        await tokenB.mint(user1.address, ethers.parseEther("1000"));
-
-        // 🚀 Deploy DEXRouter with real Uniswap V4 PoolManager
+        // 🚀 Deploy DEXRouter
         console.log("🚀 Deploying DEXRouter...");
         DEXRouter = await ethers.getContractFactory("DEXRouter");
         dexRouter = await DEXRouter.deploy(await poolManager.getAddress(), await WETH.getAddress());
@@ -69,11 +75,14 @@ describe("DEXRouter - Uniswap v4", function () {
             console.log("🚀 Approving DEXRouter to spend tokens...");
             await tokenA.connect(owner).approve(await dexRouter.getAddress(), ethers.parseEther("1000"));
             await tokenB.connect(owner).approve(await dexRouter.getAddress(), ethers.parseEther("1000"));
-            await tokenA.connect(owner).approve(await poolManager.getAddress(), ethers.parseEther("1000"));
-            await tokenB.connect(owner).approve(await poolManager.getAddress(), ethers.parseEther("1000"));
         });
 
         it("Should execute a valid token swap", async function () {
+            console.log("🚀 Unlocking PoolManager before swap...");
+            const unlockTx = await unlockHelper.unlock("0x");
+            await unlockTx.wait();
+            console.log("✅ PoolManager unlocked successfully!");
+
             const amountIn = ethers.parseEther("10");
             const amountOutMin = ethers.parseEther("9");
 
@@ -95,7 +104,7 @@ describe("DEXRouter - Uniswap v4", function () {
         it("Should fail swap with insufficient balance", async function () {
             await tokenA.connect(user1).approve(await dexRouter.getAddress(), ethers.parseEther("100000"));
 
-            const amountIn = ethers.parseEther("100000"); // Too high
+            const amountIn = ethers.parseEther("100000"); 
             const amountOutMin = ethers.parseEther("99");
 
             await expect(
@@ -117,6 +126,11 @@ describe("DEXRouter - Uniswap v4", function () {
         });
 
         it("Should add liquidity successfully", async function () {
+            console.log("🚀 Unlocking PoolManager before adding liquidity...");
+            const unlockTx = await unlockHelper.unlock("0x");
+            await unlockTx.wait();
+            console.log("✅ PoolManager unlocked successfully!");
+
             const amountA = ethers.parseEther("50");
             const amountB = ethers.parseEther("50");
 
@@ -142,6 +156,11 @@ describe("DEXRouter - Uniswap v4", function () {
         });
 
         it("Should remove liquidity successfully", async function () {
+            console.log("🚀 Unlocking PoolManager before removing liquidity...");
+            const unlockTx = await unlockHelper.unlock("0x");
+            await unlockTx.wait();
+            console.log("✅ PoolManager unlocked successfully!");
+
             const liquidity = ethers.parseEther("10");
 
             await expect(

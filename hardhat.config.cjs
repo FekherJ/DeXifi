@@ -1,35 +1,63 @@
-require("@nomicfoundation/hardhat-ethers");
-require("@nomiclabs/hardhat-etherscan");
-require("dotenv").config();
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv/config");
 
 module.exports = {
-  solidity: "0.8.26",
-  networks: {
-    sepolia: {
-      url: process.env.ALCHEMY_URL,
-      accounts: [process.env.PRIVATE_KEY],
-      timeout: 600000,
-      gasMultiplier: 1.5,
-    },
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      gas: 8000000,
-      timeout: 600000,
-    },
-  },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200, // Lower runs value makes the contract smaller
+          },
+          evmVersion: "cancun",
+        },
+      },
+      {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          evmVersion: "cancun",
+        },
+      },
+      {
+        version: "0.8.26",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          evmVersion: "cancun",
+        },
+      },
+    ],
   },
   paths: {
     sources: "./contracts",
+    artifacts: "./artifacts",
+    cache: "./cache",
+  },
+  networks: {
+    hardhat: {
+      chainId: 31337,
+    },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || "",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   external: {
-    sources: ["node_modules/@uniswap/v4-core/src"], // Correct way to include Uniswap V4 sources
+    contracts: [
+      {
+        artifacts: "node_modules/@uniswap/v4-core/src",
+      },
+    ],
   },
-  settings: {
-    optimizer: {
-      enabled: true,
-      runs: 200,
-    },
+  mocha: {
+    timeout: 20000,
   },
 };
