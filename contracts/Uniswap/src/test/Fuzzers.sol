@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Vm} from "forge-std/Vm.sol";
-import {StdUtils} from "forge-std/StdUtils.sol";
+import {Vm} from "../../test/forge-std/src/Vm.sol";
+import {StdUtils} from "../../test/forge-std/src/StdUtils.sol";
 
 import {IPoolManager} from "../interfaces/IPoolManager.sol";
 import {PoolKey} from "../types/PoolKey.sol";

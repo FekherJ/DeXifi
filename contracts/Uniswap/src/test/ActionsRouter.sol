@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
+import "../../test/forge-std/src/Test.sol";
 import {IPoolManager} from "../interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "../interfaces/callback/IUnlockCallback.sol";
 import {Currency} from "../types/Currency.sol";

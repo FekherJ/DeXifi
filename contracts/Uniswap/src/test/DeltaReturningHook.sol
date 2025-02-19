@@ -4,7 +4,8 @@ pragma solidity ^0.8.20;
 import {Hooks} from "../libraries/Hooks.sol";
 import {IHooks} from "../interfaces/IHooks.sol";
 import {IPoolManager} from "../interfaces/IPoolManager.sol";
-import {CurrencySettler} from "../../test/utils/CurrencySettler.sol";
+import "@uniswap/v4-core/test/utils/CurrencySettler.sol";
+
 import {PoolKey} from "../types/PoolKey.sol";
 import {BalanceDelta} from "../types/BalanceDelta.sol";
 import {Currency} from "../types/Currency.sol";
