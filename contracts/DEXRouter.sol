@@ -4,8 +4,6 @@ pragma solidity ^0.8.20;
 import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import "@uniswap/v4-core/src/types/PoolKey.sol";
-
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DEXRouter {
@@ -21,129 +19,141 @@ contract DEXRouter {
         WETH = _WETH;
     }
 
+    /**
+     * @notice Swaps an exact amount of input tokens for output tokens
+     */
     function swapExactInputSingle(
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
         uint256 amountOutMin
-    ) external returns (int128 amountOut) {
+    ) external returns (uint256 amountOut) {
         require(amountIn > 0, "Invalid amount");
 
         // Transfer tokens from user to contract
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenIn).approve(address(poolManager), amountIn);
 
-        // ✅ Define PoolKey correctly
+        // Define PoolKey correctly
         PoolKey memory poolKey = PoolKey({
-            currency0: Currency.wrap(tokenIn),  // ✅ Use Currency.wrap() to convert address to Currency
+            currency0: Currency.wrap(tokenIn),
             currency1: Currency.wrap(tokenOut),
-            fee: 3000,  // Adjust fee tier as needed
-            tickSpacing: 60,  // Default tick spacing for Uniswap v4 pools
-            hooks: IHooks(address(0))  // No hooks (set to `IHooks(address(0))`)
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
         });
 
-        // ✅ Define SwapParams correctly
+        // Define SwapParams correctly
         IPoolManager.SwapParams memory swapParams = IPoolManager.SwapParams({
-            zeroForOne: tokenIn < tokenOut,  // Determines swap direction
-            amountSpecified: int128(int256(amountIn)),  // Convert uint to signed int
-            sqrtPriceLimitX96: 0  // No price limit
+            zeroForOne: tokenIn < tokenOut,
+            amountSpecified: int128(int256(amountIn)),
+            sqrtPriceLimitX96: 0
         });
 
-        // ✅ Corrected swap() function call
-        (BalanceDelta delta) = poolManager.swap(poolKey, swapParams, ""); // ✅ FIXED: Pass an empty `bytes memory` instead of `msg.sender`
+        // Execute swap
+        (BalanceDelta delta) = poolManager.swap(poolKey, swapParams, "");
 
-        // Extract correct output amount
-        amountOut = swapParams.zeroForOne ? delta.amount1() : delta.amount0();
+        // Extract correct output amount and convert safely
+        amountOut = swapParams.zeroForOne ? uint256(int256(delta.amount1())) : uint256(int256(delta.amount0()));
 
-        require(amountOut >= 0 && uint256(int256(amountOut)) >= amountOutMin, "Insufficient output amount");
-        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, uint256(int256(amountOut)));
+        require(amountOut >= amountOutMin, "Insufficient output amount");
+
+        // Transfer output tokens to the user
+        IERC20(tokenOut).transfer(msg.sender, amountOut);
+
+        // Emit event after successful execution
+        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
+        return amountOut;
     }
 
+    /**
+     * @notice Adds liquidity to a pool
+     */
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
+        require(amountA > 0 && amountB > 0, "Amounts must be greater than 0");
 
+        IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+        IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
 
- function addLiquidity(
-    address tokenA,
-    address tokenB,
-    uint256 amountA,
-    uint256 amountB
-) external {
-    require(amountA > 0 && amountB > 0, "Amounts must be greater than 0");
+        IERC20(tokenA).approve(address(poolManager), amountA);
+        IERC20(tokenB).approve(address(poolManager), amountB);
 
-    IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
-    IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+        // Define PoolKey correctly
+        PoolKey memory poolKey = PoolKey({
+            currency0: Currency.wrap(tokenA),
+            currency1: Currency.wrap(tokenB),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
 
-    IERC20(tokenA).approve(address(poolManager), amountA);
-    IERC20(tokenB).approve(address(poolManager), amountB);
+        int24 tickLower = -887220;
+        int24 tickUpper = 887220;
 
-    // ✅ Define PoolKey correctly
-    PoolKey memory poolKey = PoolKey({
-        currency0: Currency.wrap(tokenA),  
-        currency1: Currency.wrap(tokenB),
-        fee: 3000,  
-        tickSpacing: 60,  
-        hooks: IHooks(address(0))  
-    });
+        // Step 1: Check if pool is already initialized
+        try poolManager.initialize(poolKey, 0) {} catch {}
 
-    int24 tickLower = -887220; // Minimum tick range
-    int24 tickUpper = 887220;  // Maximum tick range
+        // Step 2: Modify liquidity
+        IPoolManager.ModifyLiquidityParams memory modifyParams = IPoolManager.ModifyLiquidityParams({
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            liquidityDelta: int256(amountA + amountB),
+            salt: 0
+        });
 
-    // ✅ Step 1: Ensure pool is initialized
-    poolManager.initialize(poolKey, 0); // Initializes the pool if needed
+        poolManager.modifyLiquidity(poolKey, modifyParams, "");
 
-    // ✅ Step 2: Define ModifyLiquidityParams correctly (Add stackedLiquidityDelta)
-    IPoolManager.ModifyLiquidityParams memory modifyParams = IPoolManager.ModifyLiquidityParams({
-        tickLower: tickLower,
-        tickUpper: tickUpper,
-        liquidityDelta: int256(amountA + amountB), // ✅ Main liquidity change
-        salt: 0 // ✅ Required fourth parameter
-    });
+        // Step 3: Finalize settlement
+        poolManager.settle();
 
-    // ✅ Step 3: Modify the liquidity using correct function signature
-    poolManager.modifyLiquidity(poolKey, modifyParams, "");
-
-    // ✅ Step 4: Finalize the liquidity update
-    poolManager.settle();
-
-    emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA + amountB);
-}
-
-
-function removeLiquidity(
-    address tokenA,
-    address tokenB,
-    uint256 liquidity
-) external {
-    require(liquidity > 0, "Invalid liquidity amount");
-
-    // Define the correct PoolKey for the given token pair
-    PoolKey memory poolKey = PoolKey({
-        currency0: Currency.wrap(tokenA),  
-        currency1: Currency.wrap(tokenB),
-        fee: 3000,  // Adjust fee tier as needed
-        tickSpacing: 60,  // Default tick spacing for Uniswap v4 pools
-        hooks: IHooks(address(0))  // No hooks (set to `IHooks(address(0))`)
-    });
-
-    // Define tick range (ensure consistency with addLiquidity)
-    int24 tickLower = -887220;  // Minimum tick range
-    int24 tickUpper = 887220;   // Maximum tick range
-
-    // ✅ Step 1: Define ModifyLiquidityParams for Removing Liquidity
-    IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
-        tickLower: tickLower,
-        tickUpper: tickUpper,
-        liquidityDelta: -int256(liquidity), // ✅ Negative value to remove liquidity
-        salt: 0  // Keep it 0 unless using a custom salt for unique positions
-    });
-
-    // ✅ Step 2: Call modifyLiquidity to remove liquidity
-    poolManager.modifyLiquidity(poolKey, params, "");
-
-    // ✅ Step 3: Finalize settlement
-    poolManager.settle();
-
-    // ✅ Emit event
-    emit LiquidityRemoved(msg.sender, tokenA, tokenB, liquidity);
+        // Emit event after liquidity addition
+        emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA + amountB);
     }
 
+    /**
+     * @notice Removes liquidity from a pool
+     */
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity
+    ) external {
+        require(liquidity > 0, "Invalid liquidity amount");
+
+        PoolKey memory poolKey = PoolKey({
+            currency0: Currency.wrap(tokenA),
+            currency1: Currency.wrap(tokenB),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+
+        int24 tickLower = -887220;
+        int24 tickUpper = 887220;
+
+        // Step 1: Modify liquidity (removal)
+        IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            liquidityDelta: -int256(liquidity),
+            salt: 0
+        });
+
+        poolManager.modifyLiquidity(poolKey, params, "");
+
+        // Step 2: Finalize settlement
+        poolManager.settle();
+
+        // Step 3: Transfer tokens back to the user
+        IERC20(tokenA).transfer(msg.sender, liquidity / 2);
+        IERC20(tokenB).transfer(msg.sender, liquidity / 2);
+
+        // Emit event after liquidity removal
+        emit LiquidityRemoved(msg.sender, tokenA, tokenB, liquidity);
+    }
 }
