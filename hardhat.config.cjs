@@ -23,8 +23,9 @@ module.exports = {
   paths: {
     sources: "./contracts",
   },
-  external: {
-    sources: ["node_modules/@uniswap/v4-core/src"], // Ensure Uniswap V4 sources are compiled
+  paths: {
+    sources: "./contracts",
+    imports: ["node_modules/@uniswap/v4-core/src"],
   },
   settings: {
     optimizer: {
