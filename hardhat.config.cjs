@@ -40,7 +40,9 @@ module.exports = {
     sources: "./contracts",
     artifacts: "./artifacts",
     cache: "./cache",
+    libraries: "./node_modules/@uniswap/v4-core/src"
   },
+  
   networks: {
     hardhat: {
       chainId: 31337,
