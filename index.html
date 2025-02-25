@@ -4,20 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stakely Dashboard</title>
-  <link rel="stylesheet" href="../styles/style.css">
-  <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/styles/style.css">
+  <link rel="icon" href="/src/favicon.ico" type="image/x-icon">
 
-  <!-- Import Tailwind (Optional if not already configured via CDN or PostCSS) -->
+  <!-- Import Tailwind via CDN (Only if not using PostCSS) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Import React Application -->
-  <script type="module" src="./index.js" defer></script>
+  <script type="module" src="/src/index.jsx" defer></script>
 </head>
 <body class="bg-gradient-to-br from-purple-900 via-gray-900 to-black text-white min-h-screen">
-  <!-- Connection Status (optional notification bar) -->
- 
-
-  <!-- Main React Mount Point -->
+  <!-- React Mount Point -->
   <div id="react-dashboard" class="container mx-auto p-8"></div>
 </body>
 </html>

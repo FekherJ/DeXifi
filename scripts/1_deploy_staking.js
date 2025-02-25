@@ -3,7 +3,7 @@ const { ethers } = hardhat;
 import dotenv from "dotenv";
 import fs from "fs";
 
-dotenv.config();
+dotenv.config({ path: "./.env" }); // ✅ Explicitly set the path to ensure it loads
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -39,18 +39,20 @@ async function main() {
   const stakingContractAddress = await stakingContract.getAddress();
   console.log("Staking Contract deployed to:", await stakingContract.getAddress());
 
-  // ✅ Overwrite `.env` file with new contract addresses
-  const envConfig = `
-  ALCHEMY_URL=${process.env.ALCHEMY_URL}
-  PRIVATE_KEY=${process.env.PRIVATE_KEY}
-  ETHERSCAN_API_KEY=${process.env.ETHERSCAN_API_KEY}
-  REACT_APP_STAKING_CONTRACT_ADDRESS=${stakingContractAddress}
-  REACT_APP_STAKING_TOKEN_ADDRESS=${stakingTokenAddress}
-  REACT_APP_REWARD_TOKEN_ADDRESS=${rewardTokenAddress}
-    `.trim(); // ✅ Ensures no blank lines
 
-  fs.writeFileSync(".env", envConfig);
-  console.log("✅ Updated .env with new contract addresses");
+const updatedEnvConfig = `
+ALCHEMY_URL=${process.env.ALCHEMY_URL}
+PRIVATE_KEY=${process.env.PRIVATE_KEY}
+ETHERSCAN_API_KEY=${process.env.ETHERSCAN_API_KEY}
+VITE_STAKING_CONTRACT_ADDRESS=${stakingContractAddress}
+VITE_STAKING_TOKEN_ADDRESS=${stakingTokenAddress}
+VITE_REWARD_TOKEN_ADDRESS=${rewardTokenAddress}
+`.trim();
+
+// Write updated values to .env
+fs.writeFileSync(".env", updatedEnvConfig, { encoding: "utf8", flag: "w" });
+
+console.log("✅ Updated .env with new contract addresses!");
 
 
   // Mint some tokens for testing purposes

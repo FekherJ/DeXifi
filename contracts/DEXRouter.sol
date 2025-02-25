@@ -1,49 +1,74 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface ILiquidityPool {
-    function addLiquidity(uint256 amountA, uint256 amountB) external;
-    function removeLiquidity(uint256 lpAmount) external;
-    function swap(address tokenIn, address tokenOut, uint256 amountIn) external returns (uint256 amountOut);
-}
-
-interface ILiquidityPoolFactory {
-    function getPool(address tokenA, address tokenB) external view returns (address);
-}
-
+import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import "@uniswap/v4-core/src/PoolManager.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@uniswap/v4-core/src/libraries/Lock.sol";
+import "@uniswap/v4-core/src/libraries/TickMath.sol";
+import "@uniswap/v4-core/src/types/Currency.sol";
 
 contract DEXRouter {
-    ILiquidityPoolFactory public factory;
+    IPoolManager public immutable poolManager;
+    address public immutable WETH;
 
-    event LiquidityAdded(address indexed provider, address tokenA, address tokenB, uint256 amountA, uint256 amountB);
-    event LiquidityRemoved(address indexed provider, address tokenA, address tokenB, uint256 lpAmount);
     event SwapExecuted(address indexed trader, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+    event LiquidityAdded(address indexed provider, address tokenA, address tokenB, uint256 liquidity);
+    event LiquidityRemoved(address indexed provider, address tokenA, address tokenB, uint256 liquidity);
 
-    constructor(address _factory) {
-        factory = ILiquidityPoolFactory(_factory);
+    constructor(address _poolManager, address _WETH) {
+        poolManager = IPoolManager(_poolManager);
+        WETH = _WETH;
     }
 
-    function addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB) external {
-        address pool = factory.getPool(tokenA, tokenB);
-        require(pool != address(0), "Liquidity pool does not exist");
+    function swapExactInputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOutMin
+    ) external {
+        // Transfer input tokens from sender
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
 
-        ILiquidityPool(pool).addLiquidity(amountA, amountB);
-        emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA, amountB);
-    }
+        // Simulate the swap logic - assuming Uniswap-like functionality
+        uint256 amountOut = _calculateSwap(tokenIn, tokenOut, amountIn);
+        require(amountOut >= amountOutMin, "DEXRouter: Slippage exceeded");
 
-    function removeLiquidity(address tokenA, address tokenB, uint256 lpAmount) external {
-        address pool = factory.getPool(tokenA, tokenB);
-        require(pool != address(0), "Liquidity pool does not exist");
+        // Transfer output tokens to sender
+        IERC20(tokenOut).transfer(msg.sender, amountOut);
 
-        ILiquidityPool(pool).removeLiquidity(lpAmount);
-        emit LiquidityRemoved(msg.sender, tokenA, tokenB, lpAmount);
-    }
-
-    function swap(address tokenIn, address tokenOut, uint256 amountIn) external {
-        address pool = factory.getPool(tokenIn, tokenOut);
-        require(pool != address(0), "Liquidity pool does not exist");
-
-        uint256 amountOut = ILiquidityPool(pool).swap(tokenIn, tokenOut, amountIn);
         emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
+    }
+
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
+        // Transfer liquidity to the pool
+        IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
+        IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
+
+        // Simulate liquidity being added
+        emit LiquidityAdded(msg.sender, tokenA, tokenB, amountA + amountB);
+    }
+
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity
+    ) external {
+        // Simulate liquidity being removed
+        emit LiquidityRemoved(msg.sender, tokenA, tokenB, liquidity);
+    }
+
+    function _calculateSwap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn
+    ) internal pure returns (uint256) {
+        // Simple swap logic - adjust for Uniswap pool rates in real implementation
+        return (amountIn * 98) / 100; // 2% fee simulation
     }
 }
