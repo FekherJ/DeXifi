@@ -157,7 +157,3 @@ npx hardhat run scripts/deploy_dexrouter.js --network sepolia
 ## **License**
 This project is licensed under the **MIT License**.
 
----
-
-### **🚀 Ready to push?**
-This README fully reflects your **DEX, liquidity, and staking functionalities.** Let me know if you want to tweak anything! 🔥🚀
