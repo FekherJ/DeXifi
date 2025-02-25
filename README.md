@@ -1,10 +1,8 @@
+# **Decentralized Exchange (DEX) and Staking Platform**
 
-# Staking and Yield Farming Smart Contract
+This project implements a **Decentralized Exchange (DEX) with liquidity management**, **staking**, and **yield farming** functionalities on Ethereum. It allows users to **swap tokens, provide liquidity, stake tokens, and earn rewards** in a decentralized manner.
 
-This project demonstrates a **staking and yield farming contract** written in Solidity. Users can stake ERC-20 tokens and earn rewards over time, with features for withdrawing stakes and claiming rewards.
-
-## Table of Contents
-
+## **Table of Contents**
 - [Introduction](#introduction)
 - [Features](#features)
 - [Technologies Used](#technologies-used)
@@ -15,121 +13,151 @@ This project demonstrates a **staking and yield farming contract** written in So
 - [Front-End Integration](#front-end-integration)
 - [License](#license)
 
-## Introduction
+---
 
-The **Staking and Yield Farming Contract** allows users to:
-- Stake ERC-20 tokens.
-- Earn rewards based on how long they have staked their tokens.
-- Withdraw their staked tokens at any time.
-- Claim rewards once they have been earned.
+## **Introduction**
+This project provides a **fully on-chain decentralized exchange (DEX)** inspired by **Uniswap v4**, with integrated **staking and yield farming**. Users can:
+- Swap ERC-20 tokens.
+- Provide liquidity and earn LP rewards.
+- Stake tokens to earn additional rewards.
+- Withdraw liquidity and claim rewards.
 
-This contract is intended to provide a simple mechanism for staking, with future plans for implementing yield farming and more advanced reward mechanisms.
+It leverages **Uniswap v4 pool management** while adding **custom smart contract logic** for staking and yield farming.
 
-## Features
+---
 
-- **Staking**: Users can stake an amount of ERC-20 tokens in exchange for rewards.
-- **Rewards**: Rewards are distributed based on a predefined reward rate.
-- **Withdrawals**: Users can withdraw their staked tokens at any time.
-- **Claim Rewards**: Users can claim accumulated rewards from staking.
-- **Event Emissions**: Contract emits events for staking, withdrawal, and reward claims.
+## **Features**
+### ✅ **DEX (Decentralized Exchange)**
+- **Token Swaps:** Users can swap ERC-20 tokens using a liquidity pool model.
+- **Liquidity Management:** Users can provide liquidity and receive LP tokens.
+- **Automated Market Maker (AMM):** Trades are executed based on the constant product formula.
+- **Fee Distribution:** A portion of swap fees goes to liquidity providers.
 
-## Technologies Used
+### ✅ **Liquidity Pools**
+- **Add Liquidity:** Users can deposit token pairs to liquidity pools.
+- **Remove Liquidity:** Users can withdraw their liquidity at any time.
 
-- **Solidity**: Smart contract language for writing the staking logic.
-- **Hardhat**: Ethereum development environment.
-- **OpenZeppelin**: Library for using standard ERC-20 token interfaces.
-- **Ethers.js**: JavaScript library for interacting with the Ethereum blockchain (optional for front-end).
-- **Node.js**: For managing dependencies and running the development environment.
+### ✅ **Staking and Yield Farming**
+- **Staking:** Users can lock up tokens in exchange for rewards.
+- **Rewards Calculation:** Yield is distributed based on a predefined formula.
+- **Claiming Rewards:** Users can claim staking rewards separately.
 
-## Installation and Setup
+### ✅ **Security and Optimizations**
+- **Custom Hooks and Callbacks:** The system ensures safe interactions between liquidity providers and the DEX.
+- **Permissionless Trading:** Any ERC-20 token can be listed for swapping.
+- **OpenZeppelin Security:** Uses secure libraries for token interactions.
 
-To get started with this project, follow these steps:
+---
 
-### Prerequisites
+## **Technologies Used**
+- **Solidity** - Smart contract programming.
+- **Hardhat** - Ethereum development and testing.
+- **Ethers.js** - Blockchain interaction library.
+- **OpenZeppelin** - Standardized security libraries.
+- **Uniswap v4 Core** - Pool management integration.
+- **Node.js** - Scripting and contract deployment.
 
-Ensure you have the following installed:
+---
+
+## **Installation and Setup**
+### **Prerequisites**
+Ensure you have:
 - **Node.js** (https://nodejs.org/)
 - **npm** or **yarn**
+- **Hardhat**
+- **MetaMask** (for interacting with deployed contracts)
 
-### Install Dependencies
+### **Clone the Repository**
+```bash
+git clone https://github.com/FekherJ/ChainFlight.git
+cd ChainFlight
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/FekherJ/ChainFlight.git
-   cd staking-contract
-   ```
+### **Install Dependencies**
+```bash
+npm install
+```
 
-2. Install the project dependencies:
-   ```bash
-   npm install
-   ```
+### **Compile Contracts**
+```bash
+npx hardhat compile
+```
 
-3. Install **OpenZeppelin** contracts:
-   ```bash
-   npm install @openzeppelin/contracts
-   ```
+### **Start Local Blockchain**
+```bash
+npx hardhat node
+```
 
-### Hardhat Setup
+### **Deploy Contracts Locally**
+```bash
+npx hardhat run scripts/deploy_dexrouter.js --network localhost
+```
 
-1. Create a new Hardhat project:
-   ```bash
-   npx hardhat
-   ```
+---
 
-2. Follow the prompts to create a basic project structure.
+## **Usage**
+### **1️⃣ Adding Liquidity**
+To add liquidity:
+```javascript
+await dexRouter.addLiquidity(tokenA.address, tokenB.address, amountA, amountB);
+```
 
-### Configuration
+### **2️⃣ Swapping Tokens**
+To swap tokens:
+```javascript
+await dexRouter.swapExactInputSingle(tokenA.address, tokenB.address, amountIn, amountOutMin);
+```
 
-In your `hardhat.config.js`, set up the required network details (for testnets or mainnet deployment) by adding Infura/Alchemy and your private key for deployment.
+### **3️⃣ Staking Tokens**
+To stake tokens:
+```javascript
+await stakingContract.stake(amount);
+```
 
-## Usage
+### **4️⃣ Claiming Rewards**
+To claim staking rewards:
+```javascript
+await stakingContract.getReward();
+```
 
-### Staking Tokens
+---
 
-1. Deploy the contract using Hardhat.
-2. Users can stake ERC-20 tokens by interacting with the `stake` function.
-3. Staked tokens will accumulate rewards based on the `rewardRate`.
-
-### Withdrawing Tokens
-
-1. Users can withdraw their staked tokens by calling the `withdraw` function.
-2. The contract ensures that users cannot withdraw more than they have staked.
-
-### Claiming Rewards
-
-1. Users can call the `getReward` function to claim their earned rewards.
-
-## Testing
-
-- You can test the contract using **Hardhat**. Write tests to verify:
-  - Users can stake tokens.
-  - Rewards are calculated correctly over time.
-  - Users can withdraw staked tokens.
-  - Users can claim rewards.
-  
-Run the tests with:
+## **Testing**
+Run unit tests using Hardhat:
 ```bash
 npx hardhat test
 ```
+The test suite includes:
+- ✅ Token swaps.
+- ✅ Liquidity management.
+- ✅ Staking functionality.
+- ✅ Security and edge case tests.
 
-## Deployment
+---
 
-You can deploy the contract to a testnet (like Goerli) or mainnet using Hardhat.
-
-1. Update your `hardhat.config.js` with the testnet or mainnet configuration (Infura/Alchemy keys, private key).
-2. Deploy the contract using:
+## **Deployment**
+To deploy on a **testnet (Sepolia/Goerli)**:
+1. Configure **hardhat.config.js** with your **Infura/Alchemy API Key** and **Private Key**.
+2. Deploy:
 ```bash
-npx hardhat run scripts/deploy.js --network goerli
+npx hardhat run scripts/deploy_dexrouter.js --network sepolia
 ```
 
-## Front-End Integration
+---
 
-- You can integrate this smart contract with a front-end dApp using **React** and **ethers.js**.
-- Create a dashboard to show:
-  - User staked balances.
-  - Earned rewards.
-  - Withdraw and claim buttons.
+## **Front-End Integration**
+- Uses **React + ethers.js** for interacting with smart contracts.
+- Implements a **DEX interface** where users can:
+  - Swap tokens.
+  - Add/remove liquidity.
+  - Stake and claim rewards.
 
-## License
+---
 
-This project is licensed under the MIT License.
+## **License**
+This project is licensed under the **MIT License**.
+
+---
+
+### **🚀 Ready to push?**
+This README fully reflects your **DEX, liquidity, and staking functionalities.** Let me know if you want to tweak anything! 🔥🚀
