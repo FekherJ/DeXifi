@@ -1,3 +1,4 @@
+// used for front end integration
 import { existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSync } from "fs";
 import { join, basename } from "path";
 

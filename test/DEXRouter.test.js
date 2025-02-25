@@ -20,7 +20,6 @@ describe("DEXRouter - Uniswap v4", function () {
         poolManager = await PoolManager.deploy(owner.address);
         await poolManager.waitForDeployment();
 
-        // ✅ Deploy the MockUnlockCallback contract
         const MockUnlockCallback = await ethers.getContractFactory("MockUnlockCallback");
         mockUnlockCallback = await MockUnlockCallback.deploy(await poolManager.getAddress());
         await mockUnlockCallback.waitForDeployment();
@@ -50,7 +49,6 @@ describe("DEXRouter - Uniswap v4", function () {
         await tokenA.mint(user1.address, mintAmount);
         await tokenB.mint(user1.address, mintAmount);
 
-        // ✅ Deploy DEXRouter
         DEXRouter = await ethers.getContractFactory("DEXRouter");
         dexRouter = await DEXRouter.deploy(
             await poolManager.getAddress(),
@@ -64,7 +62,6 @@ describe("DEXRouter - Uniswap v4", function () {
             await tokenA.connect(owner).approve(await dexRouter.getAddress(), ethers.parseEther("1000"));
             await tokenB.connect(owner).approve(await dexRouter.getAddress(), ethers.parseEther("1000"));
 
-            // ✅ Explicitly Initialize Pool Before Adding Liquidity (if required)
             try {
                 await dexRouter.connect(owner).initializePool(
                     await tokenA.getAddress(),
@@ -76,7 +73,6 @@ describe("DEXRouter - Uniswap v4", function () {
                 console.log("Pool initialization skipped (already initialized or not required).");
             }
 
-            // ✅ Add Liquidity BEFORE Swap
             const amountA = ethers.parseEther("500");
             const amountB = ethers.parseEther("500");
 
@@ -106,6 +102,9 @@ describe("DEXRouter - Uniswap v4", function () {
         it("Should execute a valid token swap", async function () {
             const amountIn = ethers.parseEther("10");
             const amountOutMin = ethers.parseEther("9");
+            const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes from now
+
+            await tokenA.connect(owner).approve(await dexRouter.getAddress(), amountIn);
 
             const ownerBalanceBefore = await tokenB.balanceOf(owner.address);
 
@@ -114,7 +113,8 @@ describe("DEXRouter - Uniswap v4", function () {
                     await tokenA.getAddress(),
                     await tokenB.getAddress(),
                     amountIn,
-                    amountOutMin
+                    amountOutMin,
+                    deadline
                 )
             ).to.emit(dexRouter, "SwapExecuted");
 
@@ -122,20 +122,57 @@ describe("DEXRouter - Uniswap v4", function () {
             expect(ownerBalanceAfter).to.be.gt(ownerBalanceBefore);
         });
 
-        it("Should fail swap with insufficient balance", async function () {
-            await tokenA.connect(user1).approve(await dexRouter.getAddress(), ethers.parseEther("100000"));
 
-            const amountIn = ethers.parseEther("100000");
-            const amountOutMin = ethers.parseEther("99");
+        it("Should fail swap if there is insufficient liquidity", async function () {
+            const amountIn = ethers.parseEther("500000"); // Too high to swap
+            const amountOutMin = ethers.parseEther("450000");
+            const deadline = Math.floor(Date.now() / 1000) + 300; 
+        
+            await tokenA.connect(owner).approve(await dexRouter.getAddress(), amountIn);
+        
+            await expect(
+                dexRouter.connect(owner).swapExactInputSingle(
+                    await tokenA.getAddress(),
+                    await tokenB.getAddress(),
+                    amountIn,
+                    amountOutMin,
+                    deadline
+                )
+            ).to.be.reverted;
+
+        });
+        
+
+        it("Should fail swap if transaction deadline is exceeded", async function () {
+            const amountIn = ethers.parseEther("10");
+            const amountOutMin = ethers.parseEther("9");
+            const expiredDeadline = Math.floor(Date.now() / 1000) - 60; // 1 min ago
+
+            await expect(
+                dexRouter.connect(owner).swapExactInputSingle(
+                    await tokenA.getAddress(),
+                    await tokenB.getAddress(),
+                    amountIn,
+                    amountOutMin,
+                    expiredDeadline
+                )
+            ).to.be.revertedWith("DEXRouter: Transaction expired");
+        });
+
+        it("Should fail swap if allowance is insufficient", async function () {
+            const amountIn = ethers.parseEther("100");
+            const amountOutMin = ethers.parseEther("90");
+            const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes from now
 
             await expect(
                 dexRouter.connect(user1).swapExactInputSingle(
                     await tokenA.getAddress(),
                     await tokenB.getAddress(),
                     amountIn,
-                    amountOutMin
+                    amountOutMin,
+                    deadline
                 )
-            ).to.be.revertedWithCustomError(tokenA, "ERC20InsufficientBalance");
+            ).to.be.revertedWith("DEXRouter: Insufficient allowance");
         });
     });
 
@@ -169,6 +206,18 @@ describe("DEXRouter - Uniswap v4", function () {
                     liquidity
                 )
             ).to.emit(dexRouter, "LiquidityRemoved");
+        });
+
+        it("Should fail if non-LP tries to remove liquidity", async function () {
+            const liquidity = ethers.parseEther("10");
+
+            await expect(
+                dexRouter.connect(user1).removeLiquidity(
+                    await tokenA.getAddress(),
+                    await tokenB.getAddress(),
+                    liquidity
+                )
+            ).to.be.revertedWith("DEXRouter: Not enough LP tokens");
         });
     });
 });
