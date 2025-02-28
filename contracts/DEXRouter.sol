@@ -8,12 +8,16 @@ import "@uniswap/v4-core/src/libraries/Lock.sol";
 import "@uniswap/v4-core/src/libraries/TickMath.sol";
 import "@uniswap/v4-core/src/types/Currency.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+
+using SafeERC20 for IERC20;
+
 
 
 contract DEXRouter is ReentrancyGuard {
 
-    mapping(address => AggregatorV3Interface) public priceFeeds;
+    mapping(address => address) public priceFeeds;
     IPoolManager public immutable poolManager;
     address public immutable WETH;
 
@@ -38,68 +42,70 @@ contract DEXRouter is ReentrancyGuard {
         WETH = _WETH;
         owner = msg.sender; // Set deployer as owner
     }
+    
 
     function setPriceFeed(address token, address priceFeed) external onlyOwner {
-        priceFeeds[token] = AggregatorV3Interface(priceFeed);
+        require(token != address(0), "Invalid token address");
+        require(priceFeed != address(0), "Invalid price feed address");
+
+        priceFeeds[token] = priceFeed; // Store the address of the Chainlink price feed
     }
+
+
 
 
     function getLatestPrice(address token) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = priceFeeds[token];
-    
-        // Ensure the token has a registered price feed
-        if (address(priceFeed) == address(0)) {
-            revert("DEXRouter: No price feed for token");
-        }
+        address priceFeedAddress = priceFeeds[token];
+        require(priceFeedAddress != address(0), "DEXRouter: No price feed for token");
 
-        // Fetch latest price data
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
         (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
 
-        // Ensure the price is valid
-        if (price <= 0) {
-            revert("DEXRouter: Invalid price");
-        }
+        require(price > 0, "DEXRouter: Invalid price"); 
+        require(block.timestamp - updatedAt < 3600, "DEXRouter: Stale price data"); 
 
-        // Optional: Ensure price is recent (avoid stale data)
-        require(updatedAt > 0, "DEXRouter: Stale price data");
-
-        return uint256(price);
+        uint8 decimals = priceFeed.decimals(); // ✅ Fetch decimals dynamically
+        return uint256(price) * (10 ** (18 - decimals)); // ✅ Normalize to 18 decimals
     }
 
 
 
-    function swapExactInputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint256 amountIn,
-        uint256 amountOutMin,
-        uint256 deadline
+
+
+   function swapExactInputSingle(
+    address tokenIn,
+    address tokenOut,
+    uint256 amountIn,
+    uint256 amountOutMin,
+    uint256 deadline
     ) external nonReentrant {
         require(block.timestamp <= deadline, "DEXRouter: Transaction expired");
         require(IERC20(tokenIn).allowance(msg.sender, address(this)) >= amountIn, "DEXRouter: Insufficient allowance");
 
-        // Transfer input tokens from sender
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        // ✅ Use SafeERC20 to prevent transfer failures
+        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
-        // Fetch token prices from Chainlink price feeds
+        // ✅ Fetch token prices from Chainlink price feeds
         uint256 priceIn = getLatestPrice(tokenIn);
         uint256 priceOut = getLatestPrice(tokenOut);
         require(priceIn > 0 && priceOut > 0, "DEXRouter: Invalid price data");
 
-        // Calculate expected output amount based on Chainlink prices
+        // ✅ Calculate expected output amount based on Chainlink prices
         uint256 expectedAmountOut = (amountIn * priceIn) / priceOut;
 
         // ✅ Enforce slippage protection
         require(expectedAmountOut >= amountOutMin, "DEXRouter: Slippage exceeded");
 
-        // Ensure the contract has enough tokens to fulfill the swap
-        require(IERC20(tokenOut).balanceOf(address(this)) >= expectedAmountOut, "DEXRouter: Insufficient liquidity in contract");
+        // ✅ Ensure contract has enough tokens for the swap
+        uint256 contractBalance = IERC20(tokenOut).balanceOf(address(this));
+        require(contractBalance >= expectedAmountOut, "DEXRouter: Insufficient liquidity in contract");
 
-        // Transfer output tokens to sender
-        IERC20(tokenOut).transfer(msg.sender, expectedAmountOut);
+        // ✅ Transfer output tokens to sender
+        IERC20(tokenOut).safeTransfer(msg.sender, expectedAmountOut);
 
         emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, expectedAmountOut);
     }
+
 
 
 

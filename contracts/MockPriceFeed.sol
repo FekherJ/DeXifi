@@ -6,9 +6,10 @@ import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.so
 // @title MockPriceFeed
 // @dev Mock price feed for testing Chainlink oracle interactions
 contract MockPriceFeed is AggregatorV3Interface {
-    int256 private price;
+    uint256 private price; // ✅ Changed to uint256 since we assume no negative prices
 
-    constructor(int256 _initialPrice) {
+    constructor(uint256 _initialPrice) {
+        require(_initialPrice > 0, "MockPriceFeed: Invalid initial price");  // ✅ Prevent zero or negative initialization
         price = _initialPrice;
     }
 
@@ -24,7 +25,8 @@ contract MockPriceFeed is AggregatorV3Interface {
             uint80 answeredInRound
         )
     {
-        return (0, price, 0, block.timestamp, 0);
+        require(price > 0, "MockPriceFeed: Price not set");  // ✅ Prevent invalid prices
+        return (0, int256(price), 0, block.timestamp, 0);
     }
 
     function decimals() external pure override returns (uint8) {
@@ -32,11 +34,11 @@ contract MockPriceFeed is AggregatorV3Interface {
     }
 
     function description() external pure override returns (string memory) {
-        return "Mock Chainlink Price Feed"; // 🔹 FIXED: Added missing function
+        return "Mock Chainlink Price Feed"; // ✅ Function implemented
     }
 
     function version() external pure override returns (uint256) {
-        return 1; // 🔹 FIXED: Added missing function
+        return 1; // ✅ Function implemented
     }
 
     function getRoundData(uint80 _roundId)
@@ -51,11 +53,12 @@ contract MockPriceFeed is AggregatorV3Interface {
             uint80 answeredInRound
         )
     {
-        return (_roundId, price, 0, block.timestamp, _roundId); // 🔹 FIXED: Added missing function
+        require(price > 0, "MockPriceFeed: Price not set");  // ✅ Ensure valid price
+        return (_roundId, int256(price), 0, block.timestamp, _roundId);
     }
 
-    function setPrice(int256 _price) external {
-        require(_price > 0, "Price cannot be zero");
+    function setPrice(uint256 _price) external {
+        require(_price > 0, "MockPriceFeed: Invalid price update");  // ✅ Prevent zero price updates
         price = _price;
     }
 }
