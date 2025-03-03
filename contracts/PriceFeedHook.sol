@@ -5,7 +5,7 @@ import "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-contract PriceFeedHook is IHooks {
+abstract contract PriceFeedHook is IHooks {
     IPoolManager public immutable poolManager;
     mapping(address => AggregatorV3Interface) public priceFeeds;
 
@@ -29,16 +29,15 @@ contract PriceFeedHook is IHooks {
         return uint256(price);
     }
 
-    // ✅ Implement all required functions from IHooks
-
-    function beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96) 
-        external override returns (bytes4) 
+    // ✅ Ensure all required functions from IHooks are implemented
+    function beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
+        external override returns (bytes4)
     {
         return IHooks.beforeInitialize.selector;
     }
 
-    function afterInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick) 
-        external override returns (bytes4) 
+    function afterInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick)
+        external override returns (bytes4)
     {
         return IHooks.afterInitialize.selector;
     }
@@ -48,7 +47,7 @@ contract PriceFeedHook is IHooks {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external override returns (bytes4) 
+    ) external override returns (bytes4)
     {
         return IHooks.beforeAddLiquidity.selector;
     }
@@ -60,31 +59,9 @@ contract PriceFeedHook is IHooks {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external override returns (bytes4, BalanceDelta) 
+    ) external override returns (bytes4, BalanceDelta)
     {
         return (IHooks.afterAddLiquidity.selector, delta);
-    }
-
-    function beforeRemoveLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
-        bytes calldata hookData
-    ) external override returns (bytes4) 
-    {
-        return IHooks.beforeRemoveLiquidity.selector;
-    }
-
-    function afterRemoveLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
-        BalanceDelta delta,
-        BalanceDelta feesAccrued,
-        bytes calldata hookData
-    ) external override returns (bytes4, BalanceDelta) 
-    {
-        return (IHooks.afterRemoveLiquidity.selector, delta);
     }
 
     function beforeSwap(
@@ -92,14 +69,10 @@ contract PriceFeedHook is IHooks {
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
         bytes calldata hookData
-    ) external override returns (bytes4, BeforeSwapDelta, uint24) 
+    ) external override returns (bytes4, BeforeSwapDelta, uint24)
     {
         BeforeSwapDelta delta = BeforeSwapDelta.wrap(0);
         return (IHooks.beforeSwap.selector, delta, 0);
-
-
-
-        
     }
 
     function afterSwap(
@@ -108,7 +81,7 @@ contract PriceFeedHook is IHooks {
         IPoolManager.SwapParams calldata params,
         BalanceDelta delta,
         bytes calldata hookData
-    ) external override returns (bytes4, int128) 
+    ) external override returns (bytes4, int128)
     {
         return (IHooks.afterSwap.selector, 0);
     }
@@ -119,7 +92,7 @@ contract PriceFeedHook is IHooks {
         uint256 amount0,
         uint256 amount1,
         bytes calldata hookData
-    ) external override returns (bytes4) 
+    ) external override returns (bytes4)
     {
         return IHooks.beforeDonate.selector;
     }
@@ -130,8 +103,9 @@ contract PriceFeedHook is IHooks {
         uint256 amount0,
         uint256 amount1,
         bytes calldata hookData
-    ) external override returns (bytes4) 
+    ) external override returns (bytes4)
     {
         return IHooks.afterDonate.selector;
     }
 }
+

@@ -1,64 +1,59 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";    
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-// @title MockPriceFeed
-// @dev Mock price feed for testing Chainlink oracle interactions
-contract MockPriceFeed is AggregatorV3Interface {
-    uint256 private price; // ✅ Changed to uint256 since we assume no negative prices
+contract MockPriceFeed is AggregatorV3Interface,Ownable(msg.sender)  {
+    int256 private latestAnswer;
+    uint8 private immutable decimals_;
+    uint80 private roundId;
+    uint256 private updatedAt;
 
-    constructor(uint256 _initialPrice) {
-        require(_initialPrice > 0, "MockPriceFeed: Invalid initial price");  // ✅ Prevent zero or negative initialization
-        price = _initialPrice;
+    event PriceUpdated(int256 newPrice, uint256 timestamp);
+
+    constructor(int256 initialPrice, uint8 _decimals) {
+        latestAnswer = initialPrice;
+        decimals_ = _decimals;
+        roundId = 1;
+        updatedAt = block.timestamp;
     }
 
-    function latestRoundData()
-        external
-        view
-        override
-        returns (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        )
-    {
-        require(price > 0, "MockPriceFeed: Price not set");  // ✅ Prevent invalid prices
-        return (0, int256(price), 0, block.timestamp, 0);
+    function updatePrice(int256 newPrice) external onlyOwner {
+        latestAnswer = newPrice;
+        roundId++;
+        updatedAt = block.timestamp;
+        emit PriceUpdated(newPrice, updatedAt);
     }
 
-    function decimals() external pure override returns (uint8) {
-        return 8; // Chainlink typically uses 8 decimals
+    function decimals() external view override returns (uint8) {
+        return decimals_;
     }
 
     function description() external pure override returns (string memory) {
-        return "Mock Chainlink Price Feed"; // ✅ Function implemented
+        return "Mock Chainlink Price Feed";
     }
 
     function version() external pure override returns (uint256) {
-        return 1; // ✅ Function implemented
+        return 1;
     }
 
     function getRoundData(uint80 _roundId)
         external
         view
         override
-        returns (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        )
+        returns (uint80, int256, uint256, uint256, uint80)
     {
-        require(price > 0, "MockPriceFeed: Price not set");  // ✅ Ensure valid price
-        return (_roundId, int256(price), 0, block.timestamp, _roundId);
+        require(_roundId == roundId, "MockPriceFeed: Invalid roundId");
+        return (roundId, latestAnswer, updatedAt, updatedAt, roundId);
     }
 
-    function setPrice(uint256 _price) external {
-        require(_price > 0, "MockPriceFeed: Invalid price update");  // ✅ Prevent zero price updates
-        price = _price;
+    function latestRoundData()
+        external
+        view
+        override
+        returns (uint80, int256, uint256, uint256, uint80)
+    {
+        return (roundId, latestAnswer, updatedAt, updatedAt, roundId);
     }
 }

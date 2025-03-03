@@ -1,175 +1,247 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import "@uniswap/v4-core/src/PoolManager.sol";
+import "./PriceFeedHook.sol"; 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v4-core/src/libraries/Lock.sol";
-import "@uniswap/v4-core/src/libraries/TickMath.sol";
-import "@uniswap/v4-core/src/types/Currency.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { SafeCallback } from "@uniswap/v4-periphery/src/base/SafeCallback.sol"; 
+import { Currency } from "@uniswap/v4-core/src/types/Currency.sol";
+import { PoolKey } from "@uniswap/v4-core/src/types/PoolKey.sol";
+import { Actions } from "@uniswap/v4-periphery/src/libraries/Actions.sol";
+import { TickMath } from "@uniswap/v4-core/src/libraries/TickMath.sol"; 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-
-using SafeERC20 for IERC20;
 
 
 
-contract DEXRouter is ReentrancyGuard {
+// Babylonian Library for sqrt calculations
+library Babylonian {
+    function sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
+}
 
+contract DEXRouter is SafeCallback {
+    address public weth;
     mapping(address => address) public priceFeeds;
-    IPoolManager public immutable poolManager;
-    address public immutable WETH;
 
-    // Tracks how much liquidity each provider owns
-    mapping(address => uint256) public liquidityProviders;
-    uint256 public totalLiquidity;
+    event LiquidityAdded(
+        address indexed token0,
+        address indexed token1,
+        address indexed sender,
+        uint256 amount0,
+        uint256 amount1
+    );
 
-    event SwapExecuted(address indexed trader, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
-    event LiquidityAdded(address indexed provider, address tokenA, address tokenB, uint256 liquidity);
-    event LiquidityRemoved(address indexed provider, address tokenA, address tokenB, uint256 liquidity);
+    event LiquidityRemoved(
+        address indexed token0,
+        address indexed token1,
+        address indexed sender,
+        uint256 liquidity
+    );
+
+    event SwapExecuted(
+    address indexed token0,
+    address indexed token1,
+    address indexed sender,
+    uint256 amountIn,
+    uint256 amountOut
+);
 
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "DEXRouter: Not authorized");
-        _;
+    constructor(IPoolManager _poolManager, address _weth) SafeCallback(_poolManager) {
+        poolManager = _poolManager;
+        weth = _weth;
     }
 
-    address public owner;
-
-    constructor(address _poolManager, address _WETH) {
-        poolManager = IPoolManager(_poolManager);
-        WETH = _WETH;
-        owner = msg.sender; // Set deployer as owner
+    function setPriceFeed(address token, address feed) external {
+        priceFeeds[token] = feed;
     }
-    
-
-    function setPriceFeed(address token, address priceFeed) external onlyOwner {
-        require(token != address(0), "Invalid token address");
-        require(priceFeed != address(0), "Invalid price feed address");
-
-        priceFeeds[token] = priceFeed; // Store the address of the Chainlink price feed
-    }
-
-
-
 
     function getLatestPrice(address token) public view returns (uint256) {
-        address priceFeedAddress = priceFeeds[token];
-        require(priceFeedAddress != address(0), "DEXRouter: No price feed for token");
-
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
-        (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
-
-        require(price > 0, "DEXRouter: Invalid price"); 
-        require(block.timestamp - updatedAt < 3600, "DEXRouter: Stale price data"); 
-
-        uint8 decimals = priceFeed.decimals(); // ✅ Fetch decimals dynamically
-        return uint256(price) * (10 ** (18 - decimals)); // ✅ Normalize to 18 decimals
+        address feedAddress = priceFeeds[token];
+        require(feedAddress != address(0), "Price feed not set");
+        AggregatorV3Interface feed = AggregatorV3Interface(feedAddress);
+        (, int256 answer, , ,) = feed.latestRoundData();
+        require(answer > 0, "Invalid price");
+        uint8 feedDecimals = feed.decimals();
+        return uint256(answer) * (10 ** (18 - feedDecimals));
     }
 
+    function computeSqrtPriceX96(PoolKey memory poolKey) public view returns (uint160 sqrtPriceX96) {
+        uint256 price0 = getLatestPrice(Currency.unwrap(poolKey.currency0));
+        uint256 price1 = getLatestPrice(Currency.unwrap(poolKey.currency1));
+        //uint256 ratio = (price1 * 1e18) / price0;
+        //uint256 sqrtRatio = Babylonian.sqrt(ratio);
+        //sqrtPriceX96 = uint160((sqrtRatio * (2 ** 96)) / 1e9);
+        int24 tick = TickMath.getTickAtSqrtPrice(uint160((price1 * 1e18) / price0));
 
-
-
-
-   function swapExactInputSingle(
-    address tokenIn,
-    address tokenOut,
-    uint256 amountIn,
-    uint256 amountOutMin,
-    uint256 deadline
-    ) external nonReentrant {
-        require(block.timestamp <= deadline, "DEXRouter: Transaction expired");
-        require(IERC20(tokenIn).allowance(msg.sender, address(this)) >= amountIn, "DEXRouter: Insufficient allowance");
-
-        // ✅ Use SafeERC20 to prevent transfer failures
-        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-
-        // ✅ Fetch token prices from Chainlink price feeds
-        uint256 priceIn = getLatestPrice(tokenIn);
-        uint256 priceOut = getLatestPrice(tokenOut);
-        require(priceIn > 0 && priceOut > 0, "DEXRouter: Invalid price data");
-
-        // ✅ Calculate expected output amount based on Chainlink prices
-        uint256 expectedAmountOut = (amountIn * priceIn) / priceOut;
-
-        // ✅ Enforce slippage protection
-        require(expectedAmountOut >= amountOutMin, "DEXRouter: Slippage exceeded");
-
-        // ✅ Ensure contract has enough tokens for the swap
-        uint256 contractBalance = IERC20(tokenOut).balanceOf(address(this));
-        require(contractBalance >= expectedAmountOut, "DEXRouter: Insufficient liquidity in contract");
-
-        // ✅ Transfer output tokens to sender
-        IERC20(tokenOut).safeTransfer(msg.sender, expectedAmountOut);
-
-        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, expectedAmountOut);
+        return TickMath.getSqrtPriceAtTick(tick); // ✅ Fixed precision issues
     }
 
+    function initializePoolWithChainlink(PoolKey memory poolKey) external {
+        require(priceFeeds[Currency.unwrap(poolKey.currency0)] != address(0), "Price feed for token0 not set");
+        require(priceFeeds[Currency.unwrap(poolKey.currency1)] != address(0), "Price feed for token1 not set");
 
+        uint160 sqrtPriceX96 = computeSqrtPriceX96(poolKey);
+        bytes memory unlockData = abi.encode(
+            poolKey,
+            sqrtPriceX96
+        );
+        poolManager.unlock(unlockData);
+    }
 
+    function _unlockCallback(bytes calldata data) internal override returns (bytes memory) {
+        PoolKey memory dummyKey = PoolKey({
+            currency0: Currency.wrap(address(0)), 
+            currency1: Currency.wrap(address(0)), 
+            fee: 0, 
+            tickSpacing: 0, 
+            hooks: IHooks(address(0))
+        });
+
+        if (data.length == abi.encode(dummyKey, uint160(0)).length) {
+            (PoolKey memory poolKey, uint160 sqrtPriceX96) = abi.decode(data, (PoolKey, uint160));
+            poolManager.initialize(poolKey, sqrtPriceX96);
+        } else if (data.length == abi.encode(dummyKey, uint256(0), uint256(0)).length) {
+            (PoolKey memory poolKey, uint256 amount0, uint256 amount1) = abi.decode(data, (PoolKey, uint256, uint256));
+            poolManager.donate(poolKey, amount0, amount1, "");
+        } else {
+            revert("Invalid unlockCallback data");
+        }
+        return "";
+    }
 
     function addLiquidity(
-    address tokenA,
-    address tokenB,
-    uint256 amountA,
-    uint256 amountB
-) external nonReentrant {
-    require(tokenA != tokenB, "DEXRouter: Cannot pair a token with itself");
-    require(amountA > 0 && amountB > 0, "DEXRouter: Invalid liquidity amounts");
+    PoolKey memory poolKey,
+    uint256 amount0,
+    uint256 amount1,
+    int24 tickLower,
+    int24 tickUpper,
+    bytes32 salt
+) external {
+    require(amount0 > 0 && amount1 > 0, "Invalid amounts");
 
-    // Ensure sufficient allowance
-    require(
-        IERC20(tokenA).allowance(msg.sender, address(this)) >= amountA,
-        "DEXRouter: Insufficient allowance for tokenA"
+     // Define liquidity parameters
+    IPoolManager.ModifyLiquidityParams memory params = IPoolManager
+        .ModifyLiquidityParams({
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            liquidityDelta: int256(amount0), // Ensure this aligns with your liquidity calculation
+            salt: salt
+        });
+
+    // Securely transfer tokens to PoolManager using SafeERC20
+    SafeERC20.safeTransferFrom(IERC20(Currency.unwrap(poolKey.currency0)), msg.sender, address(poolManager), amount0);
+    SafeERC20.safeTransferFrom(IERC20(Currency.unwrap(poolKey.currency1)), msg.sender, address(poolManager), amount1);
+
+   
+
+    // Call modifyLiquidity
+    (BalanceDelta callerDelta, BalanceDelta feesAccrued) = poolManager
+        .modifyLiquidity(poolKey, params, "");
+
+    emit LiquidityAdded(
+        Currency.unwrap(poolKey.currency0),
+        Currency.unwrap(poolKey.currency1),
+        msg.sender,
+        amount0,
+        amount1
     );
-    require(
-        IERC20(tokenB).allowance(msg.sender, address(this)) >= amountB,
-        "DEXRouter: Insufficient allowance for tokenB"
-    );
-
-    // Transfer tokens from user to contract
-    bool successA = IERC20(tokenA).transferFrom(msg.sender, address(this), amountA);
-    bool successB = IERC20(tokenB).transferFrom(msg.sender, address(this), amountB);
-    require(successA && successB, "DEXRouter: Transfer failed");
-
-    // Calculate liquidity tokens issued (simplified)
-    uint256 liquidityMinted = amountA + amountB;
-    require(liquidityMinted > 0, "DEXRouter: Liquidity minting failed");
-
-    // Update the sender's LP balance
-    liquidityProviders[msg.sender] += liquidityMinted;
-    totalLiquidity += liquidityMinted;
-
-    emit LiquidityAdded(msg.sender, tokenA, tokenB, liquidityMinted);
 }
 
 
+    function swapExactInputSingle(
+    PoolKey memory poolKey,
+    uint256 amountIn,
+    uint256 deadline,
+    uint256 maxSlippage
+    ) external {
+        require(block.timestamp <= deadline, "Transaction expired");
+        require(amountIn > 0, "Invalid swap amount");
 
-    function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 liquidity
-    ) external nonReentrant {
-        require(liquidity > 0, "DEXRouter: Invalid liquidity amount");
-        require(liquidityProviders[msg.sender] >= liquidity, "DEXRouter: Not enough LP tokens");
+        // Define swap parameters
+        uint160 basePrice = computeSqrtPriceX96(poolKey);
+        // Adjusted for user-defined slippage
+        uint160 adjustedPrice = uint160(uint256(basePrice) * (100 + maxSlippage) / 100);
 
-        uint256 reserveA = IERC20(tokenA).balanceOf(address(this));
-        uint256 reserveB = IERC20(tokenB).balanceOf(address(this));
 
-        require(reserveA > 0 && reserveB > 0, "DEXRouter: Insufficient reserves");
 
-        uint256 amountA = (liquidity * reserveA) / totalLiquidity;
-        uint256 amountB = (liquidity * reserveB) / totalLiquidity;
+        // Define swap parameters
+        IPoolManager.SwapParams memory swapParams = IPoolManager.SwapParams({
+            zeroForOne: Currency.unwrap(poolKey.currency0) < Currency.unwrap(poolKey.currency1),
+            amountSpecified: int256(amountIn),
+            sqrtPriceLimitX96: adjustedPrice  // 5% slippage
+        });
 
-        liquidityProviders[msg.sender] -= liquidity;
-        totalLiquidity -= liquidity;
+        // Transfer tokens securely AFTER defining swap parameters
+        SafeERC20.safeTransferFrom(
+            IERC20(Currency.unwrap(poolKey.currency0)), 
+            msg.sender, 
+            address(poolManager), 
+            amountIn
+        );
+        
 
-        IERC20(tokenA).transfer(msg.sender, amountA);
-        IERC20(tokenB).transfer(msg.sender, amountB);
+        // Call the Uniswap v4 swap function
+        BalanceDelta swapDelta = poolManager.swap(poolKey, swapParams, "");
 
-        emit LiquidityRemoved(msg.sender, tokenA, tokenB, liquidity);
+        // Extract the correct output amount
+        int128 amountOutSigned = swapDelta.amount1() > 0 ? swapDelta.amount1() : swapDelta.amount0();
+        uint256 amountOut = amountOutSigned >= 0 ? uint256(uint128(amountOutSigned)) : uint256(uint128(-amountOutSigned));
+
+
+        emit SwapExecuted(
+            Currency.unwrap(poolKey.currency0),
+            Currency.unwrap(poolKey.currency1),
+            msg.sender,
+            amountIn,
+            amountOut
+        ); 
     }
 
-   
+
+    
+
+    function removeLiquidity(
+    PoolKey memory poolKey,
+    uint256 liquidity,
+    int24 tickLower,
+    int24 tickUpper,
+    bytes32 salt
+) external {
+    require(liquidity > 0, "Invalid liquidity amount");
+
+    // Define liquidity parameters for removal
+    IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
+        tickLower: tickLower,
+        tickUpper: tickUpper,
+        liquidityDelta: -int256(liquidity), // Negative to remove liquidity
+        salt: salt
+    });
+
+    // Call modifyLiquidity to remove liquidity
+    (BalanceDelta callerDelta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(poolKey, params, "");
+
+    // Transfer withdrawn tokens to msg.sender
+    SafeERC20.safeTransfer(IERC20(Currency.unwrap(poolKey.currency0)), msg.sender, uint256(int256(callerDelta.amount0())));
+    SafeERC20.safeTransfer(IERC20(Currency.unwrap(poolKey.currency1)), msg.sender, uint256(int256(callerDelta.amount1())));
+
+
+    emit LiquidityRemoved(
+        Currency.unwrap(poolKey.currency0),
+        Currency.unwrap(poolKey.currency1),
+        msg.sender,
+        liquidity
+    );
+}
+
 }
