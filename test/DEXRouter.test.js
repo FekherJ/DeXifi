@@ -38,9 +38,14 @@ describe("DEXRouter - Uniswap v4", function () {
             throw new Error("unlockCallback contract does not have the function 'unlock'");
         }
 
+        const WETH = await ethers.getContractFactory("WETH");
+        const weth = await WETH.deploy();
+        await weth.waitForDeployment();
+
+
         // Deploy DEXRouter (Ensure correct constructor arguments)
         const DEXRouter = await ethers.getContractFactory("DEXRouter");
-        dexRouter = await DEXRouter.deploy(poolManager.target, deployer); // Ensure WETH if needed
+        dexRouter = await DEXRouter.deploy(poolManager.target, weth.target);
         await dexRouter.waitForDeployment();
 
         // Set up price feeds
