@@ -39,6 +39,7 @@ deployment_sepolia.txt
 node_modules
 .env
 
+
 # Hardhat files
 /cache
 /artifacts

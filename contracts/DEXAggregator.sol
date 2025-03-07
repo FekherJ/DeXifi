@@ -4,7 +4,9 @@ pragma solidity ^0.8.26;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { UniversalRouter } from "@uniswap/universal-router/contracts/UniversalRouter.sol";
 import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
-import { IPermit2 } from "@uniswap/permit2/contracts/interfaces/IPermit2.sol";
+import { IPermit2 } from "@uniswap/permit2/src/interfaces/IPermit2.sol";
+
+
 
 interface IDEXRouter {
     function swapTokens(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, address recipient) external returns (uint256);
@@ -55,6 +57,7 @@ contract DEXAggregator {
         IERC20(tokenIn).approve(address(uniRouter), amountIn);
 
         bytes memory commands = abi.encodePacked(uint8(Commands.V4_SWAP));
+
         bytes;
         
         // Encode swap parameters
