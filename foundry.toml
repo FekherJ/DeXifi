@@ -2,7 +2,7 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
-auto_detect_remappings = false
+auto_detect_remappings = true
 remappings = [
     '@openzeppelin/=lib/openzeppelin-contracts/',
     '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
@@ -24,5 +24,6 @@ remappings = [
     'permit2/=lib/uniswap/permit2/',
     '@openzeppelin/contracts/token/ERC721/IERC721.sol=lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol',
     '@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Enumerable.sol',
-    '@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Metadata.sol'
+    '@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Metadata.sol',
+    "@forge-std/=lib/forge-std/src/"
 ]

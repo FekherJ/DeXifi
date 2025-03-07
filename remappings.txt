@@ -13,10 +13,10 @@
 @uniswap/universal-router/=lib/uniswap/universal-router/
 @uniswap/v4-core/=lib/uniswap/v4-core/
 @uniswap/v4-periphery/=lib/uniswap/v4-periphery/
-@solmate/=lib/solmate/
 @chainlink/=lib/chainlink/
 permit2/=lib/uniswap/permit2/
 @openzeppelin/contracts/token/ERC721/IERC721.sol=lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol
 @openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Enumerable.sol
 @openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Metadata.sol
-
+@solmate/=lib/solmate/
+@forge-std/=lib/forge-std/src/
