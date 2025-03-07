@@ -12,7 +12,7 @@
 	url = https://github.com/Uniswap/v4-periphery
 [submodule "lib/v4-core"]
 	path = lib/v4-core
-	url = https://github.com/Uniswap/v4-core
+	url = https://github.com/uniswap/v4-core
 [submodule "lib/universal-router"]
 	path = lib/universal-router
 	url = https://github.com/Uniswap/universal-router
