@@ -4,6 +4,7 @@ pragma solidity ^0.8.21;
 import "./PriceFeedHook.sol";
 
 contract MockPriceFeedHook is PriceFeedHook {
+    
     constructor(address _poolManager) PriceFeedHook(_poolManager) {}
 
     function beforeInitialize(address, PoolKey calldata, uint160) external pure override returns (bytes4) {
@@ -75,7 +76,8 @@ contract MockPriceFeedHook is PriceFeedHook {
     BalanceDelta feesAccrued,
     bytes calldata hookData
     ) external pure override returns (bytes4, BalanceDelta) {
-        return (IHooks.afterRemoveLiquidity.selector, BalanceDelta(0));
+        return (IHooks.afterRemoveLiquidity.selector, BalanceDelta.wrap(0));
+
     }
 
 

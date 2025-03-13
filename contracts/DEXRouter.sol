@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import "@uniswap/v4-core/src/PoolManager.sol";
 import "./PriceFeedHook.sol"; 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeCallback } from "@uniswap/v4-periphery/src/base/SafeCallback.sol"; 

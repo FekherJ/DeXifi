@@ -48,7 +48,7 @@
     "chai-as-promised": "^8.0.0",
     "ethers": "^6.13.5",
     "gh-pages": "^6.3.0",
-    "hardhat": "^2.22.18",
+    "hardhat": "^2.22.19",
     "hardhat-dependency-compiler": "^1.2.1",
     "hardhat-foundry": "^0.0.5",
     "hardhat-gas-reporter": "^1.0.10",

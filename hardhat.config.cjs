@@ -4,19 +4,23 @@ require("@nomicfoundation/hardhat-toolbox");
 module.exports = {
   solidity: {
     compilers: [
+
       {
-        version: "0.8.17",
+        version: "0.8.26",
         settings: {
           optimizer: {
             enabled: true,
             runs: 200,
           },
-          viaIR: true, // Enables IR-based optimization to fix "Stack too deep" error
+          viaIR: true,
+          evmVersion: "cancun"
         },
       },
+
       {
         version: "0.8.20",
         settings: {
+          viaIR: true,
           optimizer: {
             enabled: true,
             runs: 200,
@@ -26,12 +30,24 @@ module.exports = {
       {
         version: "0.8.24",
         settings: {
+          viaIR: true,
           optimizer: {
             enabled: true,
             runs: 200,
           },
         },
       },
+      {
+        version: "0.8.17",
+        viaIR: true,
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+      
     ],
   },
   networks: {
