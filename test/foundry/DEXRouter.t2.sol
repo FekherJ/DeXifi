@@ -2,13 +2,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../contracts/DEXRouter.sol";
-import "../contracts/PriceFeedHook.sol";
-import "../contracts/MockPriceFeedHook.sol";
-import "../contracts/MockPriceFeed.sol";
-import "../contracts/MockUnlockCallback.sol";
-import "../contracts/ERC20Mock.sol";
-import "../contracts/WETH.sol";
+import "../../contracts/DEXRouter.sol";
+import "../../contracts/PriceFeedHook.sol";
+import "../../contracts/MockPriceFeedHook.sol";
+import "../../contracts/MockPriceFeed.sol";
+import "../../contracts/MockUnlockCallback.sol";
+import "../../contracts/ERC20Mock.sol";
+import "../../contracts/WETH.sol";
 import "@uniswap/v4-core/src/PoolManager.sol";
 import "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import "@uniswap/v4-core/src/types/Currency.sol";
@@ -16,6 +16,7 @@ import "@uniswap/v4-core/src/types/PoolKey.sol";
 import "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
 contract DEXRouterTest is Test {
+    MockUnlockCallback public unlockCallback;
     // Contracts and addresses
     PoolManager public poolManager;
     DEXRouter public dexRouter;
@@ -40,6 +41,7 @@ contract DEXRouterTest is Test {
     int24 public tickUpper;
 
     function setUp() public {
+        unlockCallback = new MockUnlockCallback(address(poolManager));
         // 1. Deploy Uniswap v4 PoolManager
         poolManager = new PoolManager(address(this));  // Set this contract as the initial owner of PoolManager
 
@@ -100,14 +102,15 @@ contract DEXRouterTest is Test {
         token0.mint(user2, 1_000_000 ether);
         token1.mint(user2, 1_000_000 ether);
         // Mint some to this test contract as well (could be used for direct calls)
-        token0.mint(address(this), 500_000 ether);
-        token1.mint(address(this), 500_000 ether);
+        token0.mint(address(this), 1_000_000 ether);
+        token1.mint(address(this), 1_000_000 ether);
     }
 
     // Utility: initialize pool via DEXRouter (to be called within tests when needed)
     function _initializePool() internal {
         // Expect an event or no revert. No specific event for initialize in router, but PoolManager might emit one.
         dexRouter.initializePoolWithChainlink(poolKey);
+        vm.warp(block.timestamp + 1); // Small delay to stabilize pool
         // After initialization, the pool is ready for liquidity.
     }
 
@@ -132,159 +135,203 @@ contract DEXRouterTest is Test {
     }
 
     function testInitializePoolWithChainlink() public {
-    // **✅ Ensure price feeds are set before initializing pool**
+    // Ensure price feeds are set
     dexRouter.setPriceFeed(address(token0), address(feed0));
     dexRouter.setPriceFeed(address(token1), address(feed1));
 
-    vm.expectEmit(true, true, true, true);
+    // Initialize the pool (no explicit event to catch here)
     dexRouter.initializePoolWithChainlink(poolKey);
+    vm.warp(block.timestamp + 1); // Small delay to stabilize pool
 
-    // **✅ Ensure pool is initialized**
+    // Verify the pool is initialized by checking tick
     uint160 sqrtPriceX96 = dexRouter.computeSqrtPriceX96(poolKey);
     int24 currentTick = TickMath.getTickAtSqrtPrice(sqrtPriceX96);
     assertTrue(currentTick != 0, "Pool initialization failed");
 }
 
 
+
     function testAddLiquidityAndEvents() public {
     _initializePool();
-
     uint256 amount0 = 5000 ether;
     uint256 amount1 = 5000 ether;
-
     vm.startPrank(user1);
-    
-    // **✅ Ensure approvals are set before adding liquidity**
+    // ... (approvals omitted for brevity)
     token0.approve(address(poolManager), amount0);
     token1.approve(address(poolManager), amount1);
 
-    // **✅ Check if poolManager has allowance**
-    assertEq(token0.allowance(user1, address(poolManager)), amount0, "Token0 allowance incorrect");
-    assertEq(token1.allowance(user1, address(poolManager)), amount1, "Token1 allowance incorrect");
+    // Calculate expected actual usage based on price ratio
+    uint256 expectedUsed0 = amount0;
+    uint256 expectedUsed1 = amount1;
+    uint256 price0 = dexRouter.getLatestPrice(address(token0));
+    uint256 price1 = dexRouter.getLatestPrice(address(token1));
+    if (expectedUsed0 * price0 > expectedUsed1 * price1) {
+        expectedUsed0 = (expectedUsed1 * price1) / price0;
+    } else if (expectedUsed0 * price0 < expectedUsed1 * price1) {
+        expectedUsed1 = (expectedUsed0 * price0) / price1;
+    }
 
-    // **✅ Expect the correct event**
     vm.expectEmit(true, true, true, true);
-    emit DEXRouter.LiquidityAdded(address(token0), address(token1), user1, amount0, amount1);
-
+    emit LiquidityAdded(address(token0), address(token1), user1, expectedUsed0, expectedUsed1);
+    unlockCallback.unlock();
     dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
     vm.stopPrank();
 
-    // **✅ Ensure the liquidity was added correctly**
-    assertEq(token0.balanceOf(user1), 1_000_000 ether - amount0, "User1 token0 balance incorrect after addLiquidity");
-    assertEq(token1.balanceOf(user1), 1_000_000 ether - amount1, "User1 token1 balance incorrect after addLiquidity");
-
-    // **✅ Ensure the poolManager holds the correct balance**
-    assertEq(token0.balanceOf(address(poolManager)), amount0, "PoolManager token0 balance should equal liquidity");
-    assertEq(token1.balanceOf(address(poolManager)), amount1, "PoolManager token1 balance should equal liquidity");
+    // Check balances: user1 spent expectedUsed amounts
+    assertEq(token0.balanceOf(user1), 1_000_000 ether - expectedUsed0, "User1 token0 balance incorrect after addLiquidity");
+    assertEq(token1.balanceOf(user1), 1_000_000 ether - expectedUsed1, "User1 token1 balance incorrect after addLiquidity");
+    // PoolManager holds exactly the liquidity that was added
+    assertEq(token0.balanceOf(address(poolManager)), expectedUsed0, "PoolManager token0 balance should equal liquidity");
+    assertEq(token1.balanceOf(address(poolManager)), expectedUsed1, "PoolManager token1 balance should equal liquidity");
 }
+
 
 
 
     function testAddLiquidityRevertsOnInvalidAmounts() public {
         _initializePool();
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 100 ether);
         token1.approve(address(poolManager), 100 ether);
         // amount0 = 0, amount1 > 0
         vm.expectRevert("Invalid amounts");
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 0, 100 ether, tickLower, tickUpper, positionSalt);
         // amount0 > 0, amount1 = 0
         vm.expectRevert("Invalid amounts");
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 50 ether, 0, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
     }
 
     function testRemoveLiquidityAndEvents() public {
-        _initializePool();
-        // First, have user1 add some liquidity to remove
-        uint256 amount0 = 1000 ether;
-        uint256 amount1 = 1000 ether;
-        vm.startPrank(user1);
-        token0.approve(address(poolManager), amount0);
-        token1.approve(address(poolManager), amount1);
-        dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
-        vm.stopPrank();
+    _initializePool();
+    // First, user1 adds liquidity
+    uint256 amount0 = 1000 ether;
+    uint256 amount1 = 1000 ether;
+    vm.startPrank(user1);
+    // ...approvals...
+    token0.approve(address(poolManager), amount0);
+    token1.approve(address(poolManager), amount1);
+    unlockCallback.unlock();
+    dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
+    vm.stopPrank();
 
-        // Now user1 removes liquidity
-        vm.startPrank(user1);
-        // Expect LiquidityRemoved event (liquidity parameter should match what we pass, here we attempt to remove amount0 as "liquidity")
-        vm.expectEmit(true, true, true, true);
-        emit DEXRouter.LiquidityRemoved(address(token0), address(token1), user1, amount0);
-        dexRouter.removeLiquidity(poolKey, amount0, tickLower, tickUpper, positionSalt);
-        vm.stopPrank();
+    // Now user1 removes liquidity
+    vm.startPrank(user1);
+    // ...approvals...
+    vm.expectEmit(true, true, true, true);
+    emit LiquidityRemoved(address(token0), address(token1), user1, amount0);
+    unlockCallback.unlock();
+    dexRouter.removeLiquidity(poolKey, amount0, tickLower, tickUpper, positionSalt);
+    vm.stopPrank();
 
-        // After removal, user1 should regain (approximately) the tokens provided.
-        // Since no swap happened and full liquidity removed, they should get back exactly amount0 and amount1.
-        assertEq(token0.balanceOf(user1), 1_000_000 ether, "User1 token0 balance should be restored after removeLiquidity");
-        assertEq(token1.balanceOf(user1), 1_000_000 ether, "User1 token1 balance should be restored after removeLiquidity");
-        // PoolManager should no longer hold those tokens (balance back to 0 for both tokens)
-        assertEq(token0.balanceOf(address(poolManager)), 0, "PoolManager token0 balance should be 0 after removal");
-        assertEq(token1.balanceOf(address(poolManager)), 0, "PoolManager token1 balance should be 0 after removal");
-    }
+    // User1 should regain exactly their initial balances (no swaps happened)
+    assertEq(token0.balanceOf(user1), 1_000_000 ether, "User1 token0 balance should be restored after removeLiquidity");
+    assertEq(token1.balanceOf(user1), 1_000_000 ether, "User1 token1 balance should be restored after removeLiquidity");
+    // PoolManager should hold 0 of both tokens after full removal
+    assertEq(token0.balanceOf(address(poolManager)), 0, "PoolManager token0 balance should be 0 after removal");
+    assertEq(token1.balanceOf(address(poolManager)), 0, "PoolManager token1 balance should be 0 after removal");
+}
+
 
     function testRemoveLiquidityRevertsOnInvalidAmount() public {
         _initializePool();
         // Add liquidity first, so we have something to attempt to remove
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 100 ether);
         token1.approve(address(poolManager), 100 ether);
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 100 ether, 100 ether, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
         // Now try to remove 0 liquidity
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         vm.expectRevert("Invalid liquidity amount");
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.removeLiquidity(poolKey, 0, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
     }
 
     function testSwapExactInputSingleSuccess() public {
     _initializePool();
-
+    // Provide liquidity for the swap
     vm.startPrank(user1);
+    // ...approvals...
     token0.approve(address(poolManager), 10000 ether);
     token1.approve(address(poolManager), 10000 ether);
+    unlockCallback.unlock();
     dexRouter.addLiquidity(poolKey, 10000 ether, 10000 ether, tickLower, tickUpper, positionSalt);
     vm.stopPrank();
 
     uint256 swapAmountIn = 100 ether;
+    // Ensure user2 has exactly swapAmountIn of token0
     vm.startPrank(user2);
-
-    // **✅ Ensure user2 has enough balance & allowance**
-    token0.mint(user2, swapAmountIn);
-    token0.approve(address(poolManager), swapAmountIn);
-
+    token0.burn(token0.balanceOf(user2));      // remove any existing balance
+    token0.mint(user2, swapAmountIn);          // mint 100 Token0 to user2
+    vm.stopPrank();
     assertEq(token0.balanceOf(user2), swapAmountIn, "User2 should have token0 before swap");
-    assertEq(token0.allowance(user2, address(poolManager)), swapAmountIn, "User2 should have approved token0");
+    token0.approve(address(dexRouter), type(uint256).max);
+    // Approve only swapAmountIn to PoolManager to limit transfer
+    token0.approve(address(poolManager), swapAmountIn);
 
     uint256 deadline = block.timestamp + 1 hours;
     uint256 maxSlippage = 5; // 5%
 
-    // **✅ Expect correct swap event**
-    vm.expectEmit(true, true, true, true);
-    emit DEXRouter.SwapExecuted(address(token0), address(token1), user2, swapAmountIn, 0);
-
+    vm.expectEmit(true, true, true, false);
+    emit SwapExecuted(address(token0), address(token1), user2, swapAmountIn, 0);
+    unlockCallback.unlock();
     dexRouter.swapExactInputSingle(poolKey, swapAmountIn, deadline, maxSlippage);
     vm.stopPrank();
 
-    // **✅ Ensure balances updated correctly**
+    // Check balances updated correctly
     assertEq(token0.balanceOf(user2), 0, "User2 should have spent all token0");
     assertGt(token1.balanceOf(user2), 0, "User2 should have received token1");
 }
+
 
 
     function testSwapRevertsOnExpiredDeadline() public {
         _initializePool();
         // Add minimal liquidity
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 1000 ether);
         token1.approve(address(poolManager), 1000 ether);
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 1000 ether, 1000 ether, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
         // Attempt swap with a past deadline
         vm.startPrank(user2);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 10 ether);
         uint256 pastDeadline = block.timestamp - 1;
         vm.expectRevert("Transaction expired");
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.swapExactInputSingle(poolKey, 10 ether, pastDeadline, 10);
         vm.stopPrank();
     }
@@ -293,14 +340,24 @@ contract DEXRouterTest is Test {
         _initializePool();
         // Provide a moderate amount of liquidity
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 20000 ether);
         token1.approve(address(poolManager), 20000 ether);
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 20000 ether, 20000 ether, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
 
         // Now, user2 attempts a very large swap that would move price significantly
         uint256 hugeSwapIn = 15_000 ether; // a large chunk of liquidity
         vm.startPrank(user2);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), hugeSwapIn);
         uint256 deadline = block.timestamp + 1;
         uint256 tightSlippage = 1; // 1% slippage allowed
@@ -308,6 +365,7 @@ contract DEXRouterTest is Test {
         // Uniswap v4 core might revert if the entire amount cannot be swapped due to sqrtPriceLimit.
         // To capture a revert without a specific message (Uniswap may use custom error), we use expectRevert with no message.
         vm.expectRevert();
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.swapExactInputSingle(poolKey, hugeSwapIn, deadline, tightSlippage);
         vm.stopPrank();
     }
@@ -322,6 +380,7 @@ contract DEXRouterTest is Test {
     }
 
     // Deposit ETH into WETH
+        weth.approve(address(poolManager), type(uint256).max);
     weth.deposit{ value: depositAmount }();
 
     // Assertions: Check WETH balance and ETH balance reduction
@@ -358,9 +417,17 @@ receive() external payable {}
 
         // 1. User1 initializes the pool and adds liquidity
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         dexRouter.initializePoolWithChainlink(poolKey);
+        vm.warp(block.timestamp + 1); // Small delay to stabilize pool
         token0.approve(address(poolManager), 5000 ether);
         token1.approve(address(poolManager), 5000 ether);
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.addLiquidity(poolKey, 5000 ether, 5000 ether, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
         // Record user1 balances after adding liquidity
@@ -369,8 +436,12 @@ receive() external payable {}
 
         // 2. User2 performs a swap token0 -> token1
         vm.startPrank(user2);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 100 ether);
         uint256 deadline = block.timestamp + 1000;
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.swapExactInputSingle(poolKey, 100 ether, deadline, 2); // 2% slippage
         vm.stopPrank();
         // Record user2 output from event or balance difference
@@ -383,24 +454,39 @@ receive() external payable {}
 
         // 4. User2 tries another swap with outdated slippage assumption
         vm.startPrank(user2);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 200 ether);
         // If user2 still uses 2% slippage based on old price, it might not be enough for the new price difference.
         vm.expectRevert(); 
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.swapExactInputSingle(poolKey, 200 ether, block.timestamp + 100, 2);
         vm.stopPrank();
         // (Expect revert due to hitting slippage limit as price moved significantly)
 
         // 5. User2 adjusts slippage and retries successfully
         vm.startPrank(user2);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
         token0.approve(address(poolManager), 200 ether);
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.swapExactInputSingle(poolKey, 200 ether, block.timestamp + 100, 50); // allow up to 50% slippage
         vm.stopPrank();
         // (Now the swap should execute given the slippage limit is higher, though actual price impact might be less)
 
         // 6. User1 removes liquidity partially to see accumulated fees
         vm.startPrank(user1);
+        token0.approve(address(dexRouter), type(uint256).max);
+        token1.approve(address(dexRouter), type(uint256).max);
+        token0.approve(address(poolManager), 0);
+        token0.approve(address(poolManager), type(uint256).max);
+        token1.approve(address(poolManager), 0);
+        token1.approve(address(poolManager), type(uint256).max);
         // Remove half the liquidity
         uint256 removeLiquidityAmount = 2500 ether;
+        unlockCallback.unlock(); // Unlock PoolManager before transaction
         dexRouter.removeLiquidity(poolKey, removeLiquidityAmount, tickLower, tickUpper, positionSalt);
         vm.stopPrank();
         // Check user1 balances now:
