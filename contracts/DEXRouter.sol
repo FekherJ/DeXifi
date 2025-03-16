@@ -37,6 +37,8 @@ contract DEXRouter is SafeCallback {
 
     address public weth;
     mapping(address => address) public priceFeeds;
+    mapping(address => mapping(address => uint256)) public totalLiquidity;
+
 
     event LiquidityAdded(address indexed token0, address indexed token1, address indexed sender, uint256 amount0, uint256 amount1);
     event LiquidityRemoved(address indexed token0, address indexed token1, address indexed sender, uint256 liquidity);
@@ -52,6 +54,11 @@ contract DEXRouter is SafeCallback {
     function setPriceFeed(address token, address feed) external {
         priceFeeds[token] = feed;
     }
+
+    function getTotalLiquidity(address token0, address token1) external view returns (uint256, uint256) {
+        return (totalLiquidity[token0][token1], totalLiquidity[token1][token0]);
+    }
+
 
     function getLatestPrice(address token) public view returns (uint256) {
         address feedAddress = priceFeeds[token];
@@ -114,6 +121,10 @@ contract DEXRouter is SafeCallback {
     });
 
     poolManager.modifyLiquidity(poolKey, params, "");
+
+    // Store liquidity amounts after adding liquidity
+    totalLiquidity[token0][token1] += amount0;
+    totalLiquidity[token1][token0] += amount1; // Ensure bidirectional tracking
 
     // Refund any unused tokens
     uint256 balance0After = IERC20(token0).balanceOf(address(this));
@@ -205,7 +216,23 @@ contract DEXRouter is SafeCallback {
 
         (BalanceDelta callerDelta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(poolKey, params, "");
 
+        address token0 = Currency.unwrap(poolKey.currency0);
+        address token1 = Currency.unwrap(poolKey.currency1);
 
+        // Subtract removed liquidity from the totalLiquidity mapping
+        if (totalLiquidity[token0][token1] >= uint256(int256(callerDelta.amount0()))) {
+            totalLiquidity[token0][token1] -= uint256(int256(callerDelta.amount0()));
+        } else {
+            totalLiquidity[token0][token1] = 0; // Prevent underflow
+        }
+
+        if (totalLiquidity[token1][token0] >= uint256(int256(callerDelta.amount1()))) {
+            totalLiquidity[token1][token0] -= uint256(int256(callerDelta.amount1()));
+        } else {
+            totalLiquidity[token1][token0] = 0; // Prevent underflow
+        }
+
+        // Transfer removed liquidity back to the user
         IERC20(Currency.unwrap(poolKey.currency0)).safeTransfer(msg.sender, uint256(int256(callerDelta.amount0())));
         IERC20(Currency.unwrap(poolKey.currency1)).safeTransfer(msg.sender, uint256(int256(callerDelta.amount1())));
 
