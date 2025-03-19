@@ -114,14 +114,16 @@ function setUp() public {
     uint160 sqrtPriceX96 = dexRouter.computeSqrtPriceX96(poolKey);
     require(sqrtPriceX96 > 0, "Invalid sqrtPriceX96 calculation");
 
-    // Unlock PoolManager before adding liquidity
-    bytes memory unlockData = abi.encode(poolKey, sqrtPriceX96);
-    
-    poolManager.unlock(unlockData);
-    console.log("Pool unlocked successfully");
-
     // Initialize the pool
     dexRouter.initializePoolWithChainlink(poolKey);
+
+    // Unlock PoolManager before adding liquidity
+    bytes memory unlockData = abi.encode(poolKey, sqrtPriceX96);
+    poolManager.unlock(unlockData);
+    
+    console.log("Pool unlocked successfully");
+
+    
 
     (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
     console.log("Liquidity after initialization:", liquidity0, liquidity1);
