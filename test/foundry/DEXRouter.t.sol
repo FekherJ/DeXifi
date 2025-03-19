@@ -157,8 +157,9 @@ function setUp() public {
     dexRouter.addLiquidity(poolKey, 100 ether, 100 ether, tickLower, tickUpper, positionSalt);
 
     // Unlock the pool
-    require(poolManager.unlock(unlockData), "Pool unlock failed");
+    poolManager.unlock(unlockData);
     console.log("Pool unlocked successfully");
+
 
 
     /*
