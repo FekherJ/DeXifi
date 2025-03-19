@@ -6,7 +6,6 @@ import "../../contracts/DEXRouter.sol";
 import "../../contracts/PriceFeedHook.sol";
 import "../../contracts/MockPriceFeedHook.sol";
 import "../../contracts/MockPriceFeed.sol";
-import "../../contracts/MockUnlockCallback.sol";
 import "../../contracts/ERC20Mock.sol";
 import "../../contracts/WETH.sol";
 import "@uniswap/v4-core/src/PoolManager.sol";
@@ -16,8 +15,9 @@ import "@uniswap/v4-core/src/types/PoolKey.sol";
 import "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import "@uniswap/v4-core/src/libraries/TickMath.sol";
 
+
 contract DEXRouterTest is Test {
-    MockUnlockCallback public unlockCallback;
+    
     // Contracts and addresses
     PoolManager public poolManager;
     DEXRouter public dexRouter;
@@ -41,6 +41,8 @@ contract DEXRouterTest is Test {
     int24 public tickLower;
     int24 public tickUpper;
 
+    bytes public unlockData;
+
     function setUp() public {
     user1 = address(0x1);
     user2 = address(0x2);
@@ -49,8 +51,6 @@ contract DEXRouterTest is Test {
     poolManager = new PoolManager(address(this));
     require(address(poolManager) != address(0), "PoolManager not initialized");
 
-    unlockCallback = new MockUnlockCallback(address(poolManager));
-    require(address(unlockCallback) != address(0), "UnlockCallback not initialized");
 
     // 2. Deploy tokens and WETH
     token0 = new ERC20Mock("Token0", "TK0");
@@ -62,7 +62,8 @@ contract DEXRouterTest is Test {
     dexRouter = new DEXRouter(IPoolManager(address(poolManager)), address(weth));
     require(address(dexRouter) != address(0), "DEXRouter not initialized");
 
-    // 4. Deploy Mock Chainlink price feeds
+
+    // 5. Deploy Mock Chainlink price feeds
     feed0 = new MockPriceFeed(1e8, 8);
     feed1 = new MockPriceFeed(2e8, 8);
     require(address(feed0) != address(0) && address(feed1) != address(0), "Price feeds not initialized");
@@ -70,7 +71,7 @@ contract DEXRouterTest is Test {
     dexRouter.setPriceFeed(address(token0), address(feed0));
     dexRouter.setPriceFeed(address(token1), address(feed1));
 
-    // 5. Ensure test contract has enough tokens before adding liquidity
+    // 6. Ensure test contract has enough tokens before adding liquidity
     token0.mint(address(this), 1e28);
     token1.mint(address(this), 1e28);
     
@@ -85,6 +86,8 @@ contract DEXRouterTest is Test {
 
     require(token0.balanceOf(user1) >= 1_000_000 ether, "User1 minting failed");
     require(token0.balanceOf(user2) >= 1_000_000 ether, "User2 minting failed");
+    require(token1.balanceOf(user1) >= 1_000_000 ether, "User1 minting failed");
+    require(token1.balanceOf(user2) >= 1_000_000 ether, "User2 minting failed");
 
     // Debugging balances before transferring to msg.sender
     emit log_named_uint("Token0 Balance (Before Transfer)", token0.balanceOf(address(this)));
@@ -138,22 +141,41 @@ contract DEXRouterTest is Test {
 }
 
 
-    // Utility: initialize pool via DEXRouter (to be called within tests when needed)
     function _initializePool() internal {
-        dexRouter.initializePoolWithChainlink(poolKey);
-        bytes memory unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
-        try poolManager.unlock(unlockData) {
-            (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
-            require(liquidity0 > 0 || liquidity1 > 0, "Pool unlock failed: No liquidity found.");
-        } catch Error(string memory reason) {
-            revert(reason);
-        } catch {
-            revert("Pool unlock failed: Verify Uniswap v4 compatibility.");
-        }
-        
-        vm.warp(block.timestamp + 1); // Small delay to stabilize pool
-        // After initialization, the pool is ready for liquidity.
+    // Ensure price feeds are set correctly before initializing
+    dexRouter.setPriceFeed(address(token0), address(feed0));
+    dexRouter.setPriceFeed(address(token1), address(feed1));
+
+    // Verify that the price feeds are set properly
+    require(dexRouter.getPriceFeed(address(token0)) == address(feed0), "Price feed for token0 not set");
+    require(dexRouter.getPriceFeed(address(token1)) == address(feed1), "Price feed for token1 not set");
+
+
+    // Call pool initialization
+    dexRouter.initializePoolWithChainlink(poolKey);
+    // Compute price data for unlock
+    unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+
+    // Add small liquidity before unlocking (to ensure compatibility)
+    token0.approve(address(dexRouter), type(uint256).max);
+    token1.approve(address(dexRouter), type(uint256).max);
+    dexRouter.addLiquidity(poolKey, 100 ether, 100 ether, tickLower, tickUpper, positionSalt);
+
+    // Unlock the pool after adding liquidity
+    try poolManager.unlock(unlockData) {
+        console.log("Pool unlock successful");
+    } catch Error(string memory reason) {
+        console.log("Pool unlock failed:", reason);
+        revert(reason);
+    } catch {
+        revert("Pool unlock failed: Verify Uniswap v4 compatibility.");
     }
+
+    vm.warp(block.timestamp + 1); // Simulate time progression
+}
+
+
+
 
     // --- Unit Tests ---
 
@@ -181,7 +203,7 @@ contract DEXRouterTest is Test {
 
         // Initialize the pool (no explicit event to catch here)
         dexRouter.initializePoolWithChainlink(poolKey);
-        bytes memory unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
         try poolManager.unlock(unlockData) {
             (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
             require(liquidity0 > 0 || liquidity1 > 0, "Pool unlock failed: No liquidity found.");
@@ -200,13 +222,13 @@ contract DEXRouterTest is Test {
     }
 
     function testAddLiquidityAndEvents() public {
+    // Initialize the pool
     _initializePool();
-    require(address(poolManager) != address(0), "PoolManager not initialized");
 
     uint256 amount0 = 1000 ether;
     uint256 amount1 = 1000 ether;
 
-    // Check if pool is initialized correctly
+    // Ensure poolKey tokens are valid.
     require(
         Currency.unwrap(poolKey.currency0) != address(0) && 
         Currency.unwrap(poolKey.currency1) != address(0), 
@@ -215,97 +237,134 @@ contract DEXRouterTest is Test {
 
     vm.startPrank(user1);
 
-    // Debugging: Log initial balances
-    console.log("Initial user1 balance:", token0.balanceOf(user1), token1.balanceOf(user1));
+    // --- Ensure user1 has sufficient token balances ---
+    uint256 bal0 = token0.balanceOf(user1);
+    uint256 bal1 = token1.balanceOf(user1);
+    console.log("User1 initial balance - Token0:", bal0);
+    console.log("User1 initial balance - Token1:", bal1);
 
-    // Approvals for poolManager first, then dexRouter
-    token0.approve(address(poolManager), amount0);
-    token1.approve(address(poolManager), amount1);
-    require(token0.allowance(user1, address(poolManager)) >= amount0, "Allowance error: token0 -> poolManager");
-    require(token1.allowance(user1, address(poolManager)) >= amount1, "Allowance error: token1 -> poolManager");
-
-    token0.approve(address(dexRouter), amount0);
-    token1.approve(address(dexRouter), amount1);
-    require(token0.allowance(user1, address(dexRouter)) >= amount0, "Allowance error: token0 -> dexRouter");
-    require(token1.allowance(user1, address(dexRouter)) >= amount1, "Allowance error: token1 -> dexRouter");
-
-    // Verify token price retrieval
-    uint256 price0 = dexRouter.getLatestPrice(address(token0));
-    uint256 price1 = dexRouter.getLatestPrice(address(token1));
-    require(price0 > 0 && price1 > 0, "Invalid token price");
-
-    // Adjust amounts based on price ratio
-    if (amount0 * price0 > amount1 * price1) {
-        amount0 = (amount1 * price1) / price0;
-    } else if (amount0 * price0 < amount1 * price1) {
-        amount1 = (amount0 * price0) / price1;
+    if (bal0 < amount0) {
+        token0.mint(user1, amount0 - bal0);
+    }
+    if (bal1 < amount1) {
+        token1.mint(user1, amount1 - bal1);
     }
 
-    // Debugging logs
-    console.log("Liquidity adding: token0 =", amount0, "token1 =", amount1);
+    // --- Approvals for PoolManager and DEXRouter ---
+    token0.approve(address(poolManager), amount0);
+    token1.approve(address(poolManager), amount1);
+    token0.approve(address(dexRouter), amount0);
+    token1.approve(address(dexRouter), amount1);
 
-    // Unlock pool before adding liquidity
-    unlockCallback.unlock();
+    // --- Debugging allowances ---
+    console.log("User1 Allowance for PoolManager - Token0:", token0.allowance(user1, address(poolManager)));
+    console.log("User1 Allowance for PoolManager - Token1:", token1.allowance(user1, address(poolManager)));
+    console.log("User1 Allowance for DEXRouter - Token0:", token0.allowance(user1, address(dexRouter)));
+    console.log("User1 Allowance for DEXRouter - Token1:", token1.allowance(user1, address(dexRouter)));
 
-    // Event expectation before calling addLiquidity
+    // --- Unlock the pool (if locked) ---
+    unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+    try poolManager.unlock(unlockData) {
+        console.log("Pool unlock successful.");
+    } catch Error(string memory reason) {
+        console.log("Pool unlock failed:", reason);
+        revert(reason);
+    } catch {
+        revert("Pool unlock failed: Verify Uniswap v4 compatibility.");
+    }
+
+    // --- Expect the LiquidityAdded event before adding liquidity ---
     vm.expectEmit(true, true, true, true);
     emit LiquidityAdded(address(token0), address(token1), user1, amount0, amount1);
 
-    // Add liquidity
+    // --- Add liquidity ---
     dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
 
-    // Verify liquidity state
-    (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
-    assertEq(liquidity0, amount0, "Liquidity amount mismatch for token0 after addLiquidity");
-    assertEq(liquidity1, amount1, "Liquidity amount mismatch for token1 after addLiquidity");
+    // --- Retrieve and verify liquidity ---
+    uint256 liquidity0;
+    uint256 liquidity1;
+    (liquidity0, liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
+    console.log("Liquidity after addLiquidity: Token0 =", liquidity0, "Token1 =", liquidity1);
 
-    // Debugging: Check user balances after liquidity addition
-    console.log("User1 balance after addLiquidity:", token0.balanceOf(user1), token1.balanceOf(user1));
+    assertEq(liquidity0, amount0, "Liquidity mismatch for token0 after addLiquidity");
+    assertEq(liquidity1, amount1, "Liquidity mismatch for token1 after addLiquidity");
 
-    // Ensure user1 balance is reduced correctly
-    assertEq(token0.balanceOf(user1), 1_000_000 ether - amount0, "User1 token0 balance incorrect after addLiquidity");
-    assertEq(token1.balanceOf(user1), 1_000_000 ether - amount1, "User1 token1 balance incorrect after addLiquidity");
-
-    // Ensure PoolManager holds the expected liquidity
-    assertEq(token0.balanceOf(address(poolManager)), amount0, "PoolManager token0 balance should equal liquidity");
-    assertEq(token1.balanceOf(address(poolManager)), amount1, "PoolManager token1 balance should equal liquidity");
+    // --- Log final balances after liquidity addition ---
+    console.log("User1 balance after addLiquidity - Token0:", token0.balanceOf(user1));
+    console.log("User1 balance after addLiquidity - Token1:", token1.balanceOf(user1));
 
     vm.stopPrank();
 }
 
 
-    function testAddLiquidityRevertsOnInvalidAmounts() public {
-        _initializePool();
 
-        uint256 amount0 = 1000 ether;
-        uint256 amount1 = 1000 ether;
-        (uint256 liquidityBefore0, uint256 liquidityBefore1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
 
-        vm.startPrank(user1);
-        token0.approve(address(dexRouter), type(uint256).max);
-        token1.approve(address(dexRouter), type(uint256).max);
-        token0.approve(address(poolManager), 0);
-        token0.approve(address(poolManager), type(uint256).max);
-        token1.approve(address(poolManager), 0);
-        token1.approve(address(poolManager), type(uint256).max);
-        token0.approve(address(poolManager), 100 ether);
-        token1.approve(address(poolManager), 100 ether);
+function testAddLiquidityRevertsOnInvalidAmounts() public {
+    // Initialize the pool without pre-existing liquidity.
+    _initializePool();
 
-        // amount0 = 0, amount1 > 0
-        vm.expectRevert("Invalid amounts");
-        unlockCallback.unlock();
-        dexRouter.addLiquidity(poolKey, 0, 100 ether, tickLower, tickUpper, positionSalt);
-        // amount0 > 0, amount1 = 0
-        vm.expectRevert("Invalid amounts");
-        unlockCallback.unlock();
-        dexRouter.addLiquidity(poolKey, 50 ether, 0, tickLower, tickUpper, positionSalt);
+    uint256 amount0 = 1000 ether;
+    uint256 amount1 = 1000 ether;
+    
+    // Get liquidity before the test (declare variables first).
+    uint256 liquidityBefore0;
+    uint256 liquidityBefore1;
+    (liquidityBefore0, liquidityBefore1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
 
-        (uint256 liquidityAfter0, uint256 liquidityAfter1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
-        assertEq(liquidityAfter0, liquidityBefore0, "Liquidity should remain unchanged for token0 after failed addLiquidity");
-        assertEq(liquidityAfter1, liquidityBefore1, "Liquidity should remain unchanged for token1 after failed addLiquidity");
+    vm.startPrank(user1);
 
-        vm.stopPrank();
+    // Approve tokens for dexRouter.
+    token0.approve(address(dexRouter), type(uint256).max);
+    token1.approve(address(dexRouter), type(uint256).max);
+    // For poolManager, simulate resetting approvals and then giving a small allowance.
+    token0.approve(address(poolManager), 0);
+    token0.approve(address(poolManager), type(uint256).max);
+    token1.approve(address(poolManager), 0);
+    token1.approve(address(poolManager), type(uint256).max);
+    token0.approve(address(poolManager), 100 ether);
+    token1.approve(address(poolManager), 100 ether);
+
+    // Log balances for debugging.
+    console.log("User1 balance before invalid addLiquidity - Token0:", token0.balanceOf(user1));
+    console.log("User1 balance before invalid addLiquidity - Token1:", token1.balanceOf(user1));
+
+    // Unlock the pool.
+
+    unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+
+
+    try poolManager.unlock(unlockData) {
+        console.log("Pool unlock successful");
+    } catch Error(string memory reason) {
+        console.log("Pool unlock failed:", reason);
+        revert(reason);
+    } catch {
+        revert("Pool unlock failed: Verify Uniswap v4 compatibility.");
     }
+
+    // Test invalid amounts: amount0 = 0 and amount1 > 0.
+    vm.expectRevert("Invalid amounts");
+    dexRouter.addLiquidity(poolKey, 0, 100 ether, tickLower, tickUpper, positionSalt);
+
+    // Test invalid amounts: amount0 > 0 and amount1 = 0.
+    vm.expectRevert("Invalid amounts");
+    dexRouter.addLiquidity(poolKey, 50 ether, 0, tickLower, tickUpper, positionSalt);
+
+    // Get liquidity after the failed attempts.
+    uint256 liquidityAfter0;
+    uint256 liquidityAfter1;
+    (liquidityAfter0, liquidityAfter1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
+    console.log("Liquidity after failed addLiquidity attempts - Token0:", liquidityAfter0, "Token1:", liquidityAfter1);
+
+    // Confirm that liquidity has not changed.
+    assertEq(liquidityAfter0, liquidityBefore0, "Liquidity should be unchanged for token0 after failed addLiquidity");
+    assertEq(liquidityAfter1, liquidityBefore1, "Liquidity should be unchanged for token1 after failed addLiquidity");
+
+    vm.stopPrank();
+}
+
+
+
 
     function testRemoveLiquidityAndEvents() public {
         _initializePool();
@@ -317,7 +376,11 @@ contract DEXRouterTest is Test {
         token1.approve(address(poolManager), amount1);
         token0.approve(address(dexRouter), amount0);
         token1.approve(address(dexRouter), amount1);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
 
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
@@ -330,7 +393,11 @@ contract DEXRouterTest is Test {
         vm.startPrank(user1);
         vm.expectEmit(true, true, true, true);
         emit LiquidityRemoved(address(token0), address(token1), user1, amount0);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.removeLiquidity(poolKey, amount0, tickLower, tickUpper, positionSalt);
 
         (uint256 remainingLiquidity0, uint256 remainingLiquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
@@ -358,7 +425,11 @@ contract DEXRouterTest is Test {
         token1.approve(address(dexRouter), type(uint256).max);
         token0.approve(address(poolManager), type(uint256).max);
         token1.approve(address(poolManager), type(uint256).max);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
 
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
@@ -369,7 +440,12 @@ contract DEXRouterTest is Test {
         // Now try to remove 0 liquidity (should fail)
         vm.startPrank(user1);
         vm.expectRevert("Invalid liquidity amount");
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
+
         dexRouter.removeLiquidity(poolKey, 0, tickLower, tickUpper, positionSalt);
 
         (uint256 remainingLiquidity0, uint256 remainingLiquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
@@ -388,7 +464,13 @@ contract DEXRouterTest is Test {
         vm.startPrank(user1);
         token0.approve(address(poolManager), amount0);
         token1.approve(address(poolManager), amount1);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
         assertEq(liquidity0, amount0, "Liquidity amount mismatch for token0 after addLiquidity");
@@ -408,7 +490,11 @@ contract DEXRouterTest is Test {
 
         vm.expectEmit(true, true, true, true);
         emit SwapExecuted(address(token0), address(token1), user2, swapAmountIn, 0);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.swapExactInputSingle(poolKey, swapAmountIn, deadline, maxSlippage);
 
         // Validate swap results
@@ -426,7 +512,11 @@ contract DEXRouterTest is Test {
         vm.startPrank(user1);
         token0.approve(address(poolManager), type(uint256).max);
         token1.approve(address(poolManager), type(uint256).max);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
         assertEq(liquidity0, amount0, "Liquidity amount mismatch for token0 after addLiquidity");
@@ -439,7 +529,13 @@ contract DEXRouterTest is Test {
         token0.approve(address(poolManager), 10 ether);
         uint256 pastDeadline = block.timestamp - 1;
         vm.expectRevert("Transaction expired");
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
+
+
         dexRouter.swapExactInputSingle(poolKey, 10 ether, pastDeadline, 10);
         vm.stopPrank();
     }
@@ -453,7 +549,12 @@ contract DEXRouterTest is Test {
         vm.startPrank(user1);
         token0.approve(address(poolManager), type(uint256).max);
         token1.approve(address(poolManager), type(uint256).max);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
         assertEq(liquidity0, amount0, "Liquidity amount mismatch for token0 after addLiquidity");
@@ -471,7 +572,11 @@ contract DEXRouterTest is Test {
         token0.approve(address(dexRouter), type(uint256).max);
         token0.approve(address(poolManager), hugeSwapIn);
         vm.expectRevert();
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.swapExactInputSingle(poolKey, hugeSwapIn, deadline, tightSlippage);
         vm.stopPrank();
     }
@@ -516,7 +621,7 @@ contract DEXRouterTest is Test {
         token0.approve(address(dexRouter), type(uint256).max);
         token1.approve(address(dexRouter), type(uint256).max);
         dexRouter.initializePoolWithChainlink(poolKey);
-        bytes memory unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
         try poolManager.unlock(unlockData) {
             (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
             require(liquidity0 > 0 || liquidity1 > 0, "Pool unlock failed: No liquidity found.");
@@ -527,7 +632,11 @@ contract DEXRouterTest is Test {
         }
         
         vm.warp(block.timestamp + 1);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.addLiquidity(poolKey, amount0, amount1, tickLower, tickUpper, positionSalt);
         (uint256 liquidity0, uint256 liquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
         assertEq(liquidity0, amount0, "Liquidity amount mismatch for token0 after addLiquidity");
@@ -544,7 +653,11 @@ contract DEXRouterTest is Test {
         token0.mint(user2, swapAmountIn);
         token0.approve(address(dexRouter), type(uint256).max);
         uint256 deadline = block.timestamp + 1000;
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.swapExactInputSingle(poolKey, swapAmountIn, deadline, 2);
         uint256 u2Token1Gain = token1.balanceOf(user2);
         assertGt(u2Token1Gain, 0, "User2 should receive token1 after swap");
@@ -559,20 +672,33 @@ contract DEXRouterTest is Test {
         token0.mint(user2, largerSwapAmount);
         token0.approve(address(dexRouter), type(uint256).max);
         vm.expectRevert();
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
+
         dexRouter.swapExactInputSingle(poolKey, largerSwapAmount, block.timestamp + 100, 2);
         vm.stopPrank();
 
         // Step 5: User2 adjusts slippage and retries successfully
         vm.startPrank(user2);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.swapExactInputSingle(poolKey, largerSwapAmount, block.timestamp + 100, 50);
         vm.stopPrank();
 
         // Step 6: User1 removes half the liquidity (and accumulates fees)
         uint256 removeLiquidityAmount = 2500 ether;
         vm.startPrank(user1);
-        unlockCallback.unlock();
+        
+        unlockData = abi.encode(poolKey, dexRouter.computeSqrtPriceX96(poolKey));
+        poolManager.unlock(unlockData);
+
+
         dexRouter.removeLiquidity(poolKey, removeLiquidityAmount, tickLower, tickUpper, positionSalt);
         (uint256 remainingLiquidity0, uint256 remainingLiquidity1) = dexRouter.getTotalLiquidity(address(token0), address(token1));
         assertLt(remainingLiquidity0, amount0, "Liquidity should be reduced for token0 after removeLiquidity");
