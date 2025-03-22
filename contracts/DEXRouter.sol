@@ -36,6 +36,7 @@ contract DEXRouter is SafeCallback {
     using SafeERC20 for IERC20;
     using CurrencyLibrary for Currency;
 
+
     uint160 internal constant MIN_SQRT_RATIO = 4295128739;
     uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
 
@@ -132,6 +133,7 @@ contract DEXRouter is SafeCallback {
             amount0,
             amount1
         );
+        
 
         IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
             tickLower: tickLower,
@@ -141,24 +143,18 @@ contract DEXRouter is SafeCallback {
         });
 
         (BalanceDelta delta, ) = poolManager.modifyLiquidity(poolKey, params, "");
-/*
-         if (delta.amount0() < 0) {
-            poolKey.currency0.settle(
-                poolManager,
-                address(this),
-                uint256(int256(-delta.amount0()))
-            );
+
+        if (delta.amount0() < 0) {
+            uint256 amount0ToTransfer = uint256(int256(-delta.amount0()));
+            poolKey.currency0.transfer(address(poolManager), amount0ToTransfer);
         }
         if (delta.amount1() < 0) {
-            poolKey.currency1.settle(
-                poolManager,
-                address(this),
-                uint256(int256(-delta.amount1()))
-            );
+            uint256 amount1ToTransfer = uint256(int256(-delta.amount1()));
+            poolKey.currency1.transfer(address(poolManager), amount1ToTransfer);
         }
-*/
 
-    // Add this after modifying liquidity:
+
+/*
     if (delta.amount0() < 0) {
         uint256 amount0 = uint256(int256(-delta.amount0()));
         IERC20(Currency.unwrap(poolKey.currency0)).safeTransfer(
@@ -173,6 +169,7 @@ contract DEXRouter is SafeCallback {
             amount1
         );
     }
+*/
         uint256 actualAmount0 = amount0 - (
             delta.amount0() < 0 
                 ? uint256(int256(-delta.amount0())) 
